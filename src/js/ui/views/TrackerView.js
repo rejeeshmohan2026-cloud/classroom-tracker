@@ -14,7 +14,7 @@ import { createEmptyStateElement } from '../components/EmptyState.js';
 import { getTeamScore } from '../../services/teamService.js';
 import { getDisplayName, getDisplaySubtitle } from '../../services/classroomService.js';
 
-export function renderTrackerView(container, { classroom, onBack, onSettings }) {
+export function renderTrackerView(container, { classroom, onBack, onSettings, onSelectStudent }) {
   container.innerHTML = '';
 
   const wrapper = document.createElement('div');
@@ -83,7 +83,9 @@ export function renderTrackerView(container, { classroom, onBack, onSettings }) 
     );
   } else {
     classroom.teams.forEach((team) => {
-      grid.appendChild(createTeamCardElement(team, getTeamScore(team)));
+      grid.appendChild(
+        createTeamCardElement(team, getTeamScore(team), { onStudentClick: onSelectStudent })
+      );
     });
   }
 

@@ -1,11 +1,12 @@
 /**
  * models/Team.js
  *
- * Describes the shape of a Team (previously modelled as a "Classroom"
- * before this refactor — see docs/problem-statement.md and the Sprint 1
- * history in CONTRIBUTING.md for that earlier naming). A Team belongs to
- * exactly one Classroom and owns a list of Students directly; there is no
- * separate flat student list with a foreign key back to the team.
+ * Describes the shape of a Team ("group"). A Team belongs to exactly one
+ * Classroom and owns a list of Students directly.
+ *
+ * `color` is a colour id from config/groupColorConfig.js's
+ * DEFAULT_GROUP_COLORS (e.g. "blue"), auto-assigned when the team is
+ * created and editable later (Setup Wizard Step 3, or Settings > Groups).
  *
  * Team does not carry its own score field — a team's total is always the
  * sum of its students' scores (see services/teamService.js
@@ -15,10 +16,11 @@
 
 import { generateId } from '../utils/idGenerator.js';
 
-export function createTeam({ id, name, students = [] } = {}) {
+export function createTeam({ id, name, color = null, students = [] } = {}) {
   return {
     id: id || generateId(),
     name,
+    color,
     students,
   };
 }

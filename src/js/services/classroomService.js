@@ -2,15 +2,16 @@
  * services/classroomService.js
  *
  * Holds the in-memory list of Classrooms for the current Workspace and
- * exposes classroom-level operations (create, update, delete, list).
- * workspaceService is responsible for loading/persisting this list via
- * storage — this module only manages it in memory and builds new
- * Classroom records.
+ * exposes classroom-level operations (create, update, delete, list, and
+ * importing a roster into an already-created classroom). workspaceService
+ * is responsible for loading/persisting this list via storage — this
+ * module only manages it in memory and builds new records.
  */
 
 import { createClassroom } from '../models/Classroom.js';
 import { createTeam } from '../models/Team.js';
 import { createStudent } from '../models/Student.js';
+import { getDefaultGroupColor } from '../config/groupColorConfig.js';
 import { isNonEmptyString } from '../utils/validators.js';
 
 export class ClassroomValidationError extends Error {}
@@ -40,13 +41,12 @@ export function getClassroomById(id) {
 }
 
 /**
- * Creates an empty classroom (no teams, no members yet) — the "Create
- * Manually" path from the New Classroom flow. Teams and students are
- * added afterwards via Settings > Groups / Settings > Students.
- *
- * `details` is { schoolName, gradeSection, classroomName?, academicYear?,
- * description? } — throws ClassroomValidationError if a required field
- * is missing.
+ * Creates a classroom with only its details (School Name, Grade /
+ * Section required; Classroom Name, Academic Year, Description
+ * optional) — no teams or members yet. The Setup Wizard (see
+ * ui/views/SetupWizardView.js) handles importing students, buckets,
+ * groups, and scoring afterwards, so every classroom is created this
+ * same way regardless of how it'll eventually get its roster.
  */
 export function createEmptyClassroom(details) {
   validateDetails(details);
@@ -56,26 +56,27 @@ export function createEmptyClassroom(details) {
 }
 
 /**
- * Creates a classroom from parsed CSV team/student names (see
- * services/classroomImportService.js), with every score starting at
- * zero. Used by the "Import Classroom" path. Same `details` shape and
- * validation as createEmptyClassroom().
+ * Adds teams and students, parsed from a CSV (see
+ * services/classroomImportService.js), to an *existing* classroom —
+ * used by the Setup Wizard's Import Students step. Every new team gets
+ * the next default colour in rotation (see config/groupColorConfig.js);
+ * every student starts with score 0 and no bucket assigned (buckets are
+ * handled as a separate wizard step, even when the CSV contained bucket
+ * data — see services/bucketService.js).
  */
-export function createClassroomFromImport(details, teamsWithStudentNames) {
-  validateDetails(details);
+export function importRoster(classroom, teamsWithStudentNames) {
+  const startIndex = classroom.teams.length;
 
-  const teams = teamsWithStudentNames.map((teamDef) =>
+  const newTeams = teamsWithStudentNames.map((teamDef, index) =>
     createTeam({
       name: teamDef.name,
-      students: teamDef.students.map((studentName) =>
-        createStudent({ name: studentName })
-      ),
+      color: getDefaultGroupColor(startIndex + index),
+      students: teamDef.students.map((studentName) => createStudent({ name: studentName })),
     })
   );
 
-  const classroom = createClassroom({ ...details, teams });
-  classrooms.push(classroom);
-  return classroom;
+  classroom.teams.push(...newTeams);
+  return newTeams;
 }
 
 /**

@@ -21,11 +21,15 @@
  *   teachers       - Member[] who can award points, undo, reset, import
  *                    rosters, edit students/groups, and invite teachers
  *   teams          - Team[] (see models/Team.js)
- *   settings       - free-form classroom-level settings, empty for now
+ *   settings       - classroom-level settings: bucket scoring, point
+ *                    scoring, and Setup Wizard progress — see
+ *                    config/classroomDefaults.js for the defaults, built
+ *                    fresh for every classroom (never a shared reference)
  */
 
 import { generateId } from '../utils/idGenerator.js';
 import { getCurrentIsoDate } from '../utils/dateHelpers.js';
+import { buildDefaultSettings } from '../config/classroomDefaults.js';
 
 export function createClassroom({
   id,
@@ -38,7 +42,7 @@ export function createClassroom({
   administrators = [],
   teachers = [],
   teams = [],
-  settings = {},
+  settings = buildDefaultSettings(),
 } = {}) {
   return {
     id: id || generateId(),

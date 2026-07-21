@@ -1,18 +1,16 @@
 /**
  * ui/components/NewClassroomModal.js
  *
- * The "+ New Classroom" modal: collects classroom details (School Name
- * and Grade / Section required; Classroom Name, Academic Year, and
- * Description optional), then either triggers a CSV file picker (Import
- * Classroom) or creates an empty classroom immediately (Create
- * Manually). Rendering + wiring only — the actual import parsing and
- * classroom creation are handled by the callbacks the caller supplies
- * (see main.js), not by this component. Required-field validation here
- * is just for immediate feedback; classroomService validates again
- * before anything is created.
+ * The "+ New Classroom" modal: collects only the essential classroom
+ * details (School Name and Grade / Section required; Classroom Name,
+ * Academic Year, and Description optional) and creates the classroom.
+ * Importing students, assigning buckets, customizing groups, and
+ * configuring scoring all happen afterwards in the Setup Wizard (see
+ * ui/views/SetupWizardView.js) — creation itself stays a single small
+ * step, per the "ask only for the essential information" brief.
  */
 
-export function openNewClassroomModal({ onImport, onCreateManually }) {
+export function openNewClassroomModal({ onCreate }) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
 
@@ -53,23 +51,13 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
     multiline: true,
   });
 
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.csv';
-  fileInput.hidden = true;
-
   const actions = document.createElement('div');
   actions.className = 'modal__actions';
 
-  const importButton = document.createElement('button');
-  importButton.type = 'button';
-  importButton.className = 'btn btn--primary';
-  importButton.textContent = 'Import Classroom';
-
-  const manualButton = document.createElement('button');
-  manualButton.type = 'button';
-  manualButton.className = 'btn btn--ghost';
-  manualButton.textContent = 'Create Manually';
+  const createButton = document.createElement('button');
+  createButton.type = 'button';
+  createButton.className = 'btn btn--primary';
+  createButton.textContent = 'Create Classroom';
 
   const cancelButton = document.createElement('button');
   cancelButton.type = 'button';
@@ -80,48 +68,31 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
     overlay.remove();
   }
 
-  function readDetails() {
+  createButton.addEventListener('click', () => {
     const schoolName = schoolNameInput.value.trim();
     const gradeSection = gradeSectionInput.value.trim();
 
     if (!schoolName) {
       window.alert('School Name is required.');
       schoolNameInput.focus();
-      return null;
+      return;
     }
     if (!gradeSection) {
       window.alert('Grade / Section is required.');
       gradeSectionInput.focus();
-      return null;
+      return;
     }
 
-    return {
-      schoolName,
-      gradeSection,
-      classroomName: classroomNameInput.value.trim(),
-      academicYear: academicYearInput.value.trim(),
-      description: descriptionInput.value.trim(),
-    };
-  }
-
-  importButton.addEventListener('click', () => {
-    if (!readDetails()) return;
-    fileInput.click();
-  });
-
-  fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    fileInput.value = '';
-    if (!file) return;
-    const details = readDetails();
-    if (!details) return;
-    onImport(details, file, close);
-  });
-
-  manualButton.addEventListener('click', () => {
-    const details = readDetails();
-    if (!details) return;
-    onCreateManually(details, close);
+    onCreate(
+      {
+        schoolName,
+        gradeSection,
+        classroomName: classroomNameInput.value.trim(),
+        academicYear: academicYearInput.value.trim(),
+        description: descriptionInput.value.trim(),
+      },
+      close
+    );
   });
 
   cancelButton.addEventListener('click', close);
@@ -129,8 +100,8 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
     if (event.target === overlay) close();
   });
 
-  actions.append(importButton, manualButton, cancelButton);
-  modal.append(heading, form, actions, fileInput);
+  actions.append(createButton, cancelButton);
+  modal.append(heading, form, actions);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 

@@ -2,15 +2,13 @@
  * services/workspaceService.js
  *
  * Orchestrates the Workspace (see models/Workspace.js): loading it from
- * storage on launch, creating classrooms (manually or via CSV import),
- * deleting them, and persisting after every mutation. This is the module
- * the UI/router layer talks to for anything workspace- or classroom-
- * level; per-classroom detail work (teams, students, members) goes
- * through teamService / studentService / memberService directly against
- * the classroom object once it's been fetched from here.
- *
- * Replaces Sprint 1/1A's sessionService.js now that the app supports many
- * classrooms instead of a single active session.
+ * storage on launch, creating classrooms, importing a roster into an
+ * existing classroom, deleting classrooms, and persisting after every
+ * mutation. This is the module the UI/router layer talks to for
+ * anything workspace- or classroom-level; per-classroom detail work
+ * (teams, students, buckets, members, settings) goes through the
+ * relevant service directly against the classroom object once it's been
+ * fetched from here, followed by a call to save().
  */
 
 import { STORAGE_KEY } from '../config/appConfig.js';
@@ -41,14 +39,22 @@ export function getClassroomById(id) {
   return classroomService.getClassroomById(id);
 }
 
-export function createClassroomManually(details) {
+/**
+ * Creates a classroom from just its details. Every classroom is created
+ * this way now — importing a roster is a Setup Wizard step performed
+ * afterwards (see importRosterIntoClassroom), not part of creation
+ * itself.
+ */
+export function createClassroom(details) {
   const classroom = classroomService.createEmptyClassroom(details);
   persist();
   return classroom;
 }
 
-export function importClassroom(details, teamsWithStudentNames) {
-  const classroom = classroomService.createClassroomFromImport(details, teamsWithStudentNames);
+export function importRosterIntoClassroom(classroomId, teamsWithStudentNames) {
+  const classroom = classroomService.getClassroomById(classroomId);
+  if (!classroom) return null;
+  classroomService.importRoster(classroom, teamsWithStudentNames);
   persist();
   return classroom;
 }
@@ -68,7 +74,8 @@ export function deleteClassroom(id) {
 /**
  * Call after any in-place mutation to a classroom object obtained via
  * getClassroomById() (adding a team, renaming a student, adding a
- * member, etc.) to save the change.
+ * member, assigning a bucket, updating scoring settings, etc.) to save
+ * the change.
  */
 export function save() {
   persist();

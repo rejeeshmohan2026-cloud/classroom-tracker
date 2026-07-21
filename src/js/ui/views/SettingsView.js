@@ -17,6 +17,7 @@ import * as teamService from '../../services/teamService.js';
 import * as studentService from '../../services/studentService.js';
 import * as memberService from '../../services/memberService.js';
 import * as workspaceService from '../../services/workspaceService.js';
+import * as setupProgressService from '../../services/setupProgressService.js';
 import { getDisplayName, ClassroomValidationError } from '../../services/classroomService.js';
 import { MEMBER_ROLES, PERMISSIONS, ROLE_PERMISSIONS } from '../../config/memberRoles.js';
 
@@ -30,11 +31,18 @@ const SECTION_LABELS = {
   danger: 'Danger Zone',
 };
 
-export function renderSettingsView(container, { classroom, section, onBack, onNavigateSection, onDeleted }) {
+export function renderSettingsView(container, { classroom, section, onBack, onNavigateSection, onDeleted, onReopenSetupWizard }) {
   container.innerHTML = '';
   const activeSection = SECTIONS.includes(section) ? section : 'general';
   const rerender = () =>
-    renderSettingsView(container, { classroom, section: activeSection, onBack, onNavigateSection, onDeleted });
+    renderSettingsView(container, {
+      classroom,
+      section: activeSection,
+      onBack,
+      onNavigateSection,
+      onDeleted,
+      onReopenSetupWizard,
+    });
 
   const wrapper = document.createElement('div');
   wrapper.className = 'settings-view';
@@ -72,7 +80,7 @@ export function renderSettingsView(container, { classroom, section, onBack, onNa
   content.className = 'settings-content';
 
   const sectionRenderers = {
-    general: renderGeneralSection,
+    general: (el, cls, rr) => renderGeneralSection(el, cls, rr, onReopenSetupWizard),
     students: renderStudentsSection,
     groups: renderGroupsSection,
     teachers: renderTeachersSection,
@@ -85,7 +93,9 @@ export function renderSettingsView(container, { classroom, section, onBack, onNa
   container.appendChild(wrapper);
 }
 
-function renderGeneralSection(content, classroom, rerender) {
+function renderGeneralSection(content, classroom, rerender, onReopenSetupWizard) {
+  content.appendChild(renderSetupProgressBlock(classroom, onReopenSetupWizard));
+
   const section = document.createElement('div');
   section.className = 'settings-section';
 
@@ -161,6 +171,67 @@ function createLabeledInput(section, { label, value, multiline = false }) {
   wrapper.appendChild(input);
   section.appendChild(wrapper);
   return input;
+}
+
+function renderSetupProgressBlock(classroom, onReopenSetupWizard) {
+  const block = document.createElement('div');
+  block.className = 'settings-section settings-progress-block';
+
+  const heading = document.createElement('h3');
+  heading.className = 'settings-team-block__heading';
+  heading.textContent = 'Setup Progress';
+  block.appendChild(heading);
+
+  const list = document.createElement('ul');
+  list.className = 'wizard-checklist wizard-checklist--compact';
+
+  const STATUS_ROWS = [
+    { key: 'classroomDetails', label: 'Classroom Details' },
+    { key: 'importStudents', label: 'Students Imported' },
+    { key: 'assignBuckets', label: 'Buckets Assigned' },
+    { key: 'customizeGroups', label: 'Groups Customized' },
+    { key: 'configureScoring', label: 'Scoring Configured' },
+  ];
+
+  STATUS_ROWS.forEach(({ key, label }) => {
+    list.appendChild(createStatusRow(label, setupProgressService.isStepDone(classroom, key)));
+  });
+
+  // Teacher Collaboration has no on/off state yet — it's Coming Soon
+  // regardless, same as the wizard's Invite Teachers step.
+  list.appendChild(createStatusRow('Teacher Collaboration (Coming Soon)', false));
+
+  block.appendChild(list);
+
+  const reopenButton = document.createElement('button');
+  reopenButton.type = 'button';
+  reopenButton.className = 'btn btn--ghost';
+  reopenButton.textContent = 'Continue Setup';
+  reopenButton.addEventListener('click', onReopenSetupWizard);
+  block.appendChild(reopenButton);
+
+  return block;
+}
+
+function createStatusRow(label, done) {
+  const item = document.createElement('li');
+  item.className = 'wizard-checklist__item';
+
+  const row = document.createElement('div');
+  row.className = 'wizard-checklist__row';
+
+  const icon = document.createElement('span');
+  icon.className = 'wizard-checklist__icon' + (done ? ' wizard-checklist__icon--done' : '');
+  icon.textContent = done ? '\u2713' : '';
+  icon.setAttribute('aria-hidden', 'true');
+
+  const text = document.createElement('span');
+  text.className = 'wizard-checklist__label';
+  text.textContent = label;
+
+  row.append(icon, text);
+  item.appendChild(row);
+  return item;
 }
 
 function renderStudentsSection(content, classroom, rerender) {

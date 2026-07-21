@@ -40,5 +40,9 @@ export function detectFormat(rows) {
 export function parseWithFormat(formatId, rows) {
   const format = FORMATS.find((candidate) => candidate.id === formatId);
   if (!format) throw new Error(`Unknown import format: ${formatId}`);
+  // Every format's parse() returns { teams, buckets } — buckets is an
+  // empty object for formats that have no room for bucket data (Teamed,
+  // Names Only), or a { studentName: bucketKey } map when Student List
+  // detected a Bucket column.
   return format.parse(rows);
 }

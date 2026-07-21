@@ -8,13 +8,15 @@
  */
 
 import { createTeam } from '../models/Team.js';
+import { getDefaultGroupColor } from '../config/groupColorConfig.js';
 
 export function getTeamById(classroom, teamId) {
   return classroom.teams.find((team) => team.id === teamId) || null;
 }
 
+/** New teams get the next default colour in rotation (see config/groupColorConfig.js). */
 export function addTeam(classroom, name) {
-  const team = createTeam({ name });
+  const team = createTeam({ name, color: getDefaultGroupColor(classroom.teams.length) });
   classroom.teams.push(team);
   return team;
 }
@@ -22,6 +24,12 @@ export function addTeam(classroom, name) {
 export function renameTeam(classroom, teamId, newName) {
   const team = getTeamById(classroom, teamId);
   if (team) team.name = newName;
+  return team;
+}
+
+export function updateTeamColor(classroom, teamId, colorId) {
+  const team = getTeamById(classroom, teamId);
+  if (team) team.color = colorId;
   return team;
 }
 

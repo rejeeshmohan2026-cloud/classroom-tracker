@@ -60,7 +60,9 @@ export function parse(rows) {
     );
   }
 
-  return teams;
+  // The Teamed layout has no room for a Bucket column (each column is
+  // already a group), so this format never reports bucket data.
+  return { teams, buckets: {} };
 }
 
 function rowHasGroupLabels(row) {

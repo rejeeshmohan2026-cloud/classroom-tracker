@@ -37,5 +37,6 @@ export function parse(rows) {
     throw new ClassroomImportError('No student names were found in this file.');
   }
 
-  return [{ name: UNGROUPED_TEAM_NAME, students }];
+  // A single column of names has no room for bucket data either.
+  return { teams: [{ name: UNGROUPED_TEAM_NAME, students }], buckets: {} };
 }

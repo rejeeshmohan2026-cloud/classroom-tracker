@@ -2,78 +2,33 @@
  * main.js
  *
  * Application entry point. Initialises the Workspace, wires up the
- * router, and renders whichever view the current route calls for
- * (Welcome, Home, Tracker, or Settings). The "+ New Classroom" flow
- * (modal -> import or manual create -> navigate to the new classroom) is
- * owned here since it's triggered from more than one view.
+ * router, and renders whichever view/screen the current route calls for
+ * (Welcome, Home, Tracker, Settings, or the Setup Wizard). Creating a
+ * classroom collects only its details (see ui/components/
+ * NewClassroomModal.js) and immediately routes into the Setup Wizard —
+ * importing students, buckets, groups, and scoring all happen there.
  */
 
 import * as workspaceService from './services/workspaceService.js';
-import * as classroomImportService from './services/classroomImportService.js';
-import { ClassroomImportError } from './services/classroomImportService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
 import { renderHomeView } from './ui/views/HomeView.js';
 import { renderTrackerView } from './ui/views/TrackerView.js';
 import { renderSettingsView } from './ui/views/SettingsView.js';
+import { renderSetupWizardView } from './ui/views/SetupWizardView.js';
+import { renderStudentProfileView } from './ui/views/StudentProfileView.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
-import { openImportPreviewModal } from './ui/components/ImportPreviewModal.js';
 
 let appContainer = null;
 
 function handleNewClassroom() {
   openNewClassroomModal({
-    onImport: async (details, file, closeNewClassroomModal) => {
-      let analysis;
+    onCreate: (details, close) => {
       try {
-        const csvText = await file.text();
-        analysis = classroomImportService.analyzeCsv(csvText);
-      } catch (error) {
-        window.alert('Something went wrong reading that file. Please check the CSV and try again.');
-        return;
-      }
-
-      openImportPreviewModal({
-        formats: analysis.formats,
-        initialFormatId: analysis.detected.id,
-        getPreview: (formatId) => {
-          try {
-            const teams = classroomImportService.parseWithFormat(formatId, analysis.rows);
-            return { teams };
-          } catch (error) {
-            const message =
-              error instanceof ClassroomImportError
-                ? error.message
-                : 'Could not parse this file with the selected format.';
-            return { teams: [], error: message };
-          }
-        },
-        onConfirm: (formatId) => {
-          try {
-            const teams = classroomImportService.parseWithFormat(formatId, analysis.rows);
-            const classroom = workspaceService.importClassroom(details, teams);
-            closeNewClassroomModal();
-            router.navigate(`/classroom/${classroom.id}`);
-          } catch (error) {
-            const message =
-              error instanceof ClassroomImportError || error instanceof ClassroomValidationError
-                ? error.message
-                : 'Something went wrong creating that classroom.';
-            window.alert(message);
-          }
-        },
-        onCancel: () => {
-          // Leave the New Classroom modal open so the user can pick a
-          // different file or switch to Create Manually.
-        },
-      });
-    },
-    onCreateManually: (details, close) => {
-      try {
-        const classroom = workspaceService.createClassroomManually(details);
+        const classroom = workspaceService.createClassroom(details);
         close();
-        router.navigate(`/classroom/${classroom.id}`);
+        router.navigate(`/classroom/${classroom.id}/setup`);
       } catch (error) {
         const message =
           error instanceof ClassroomValidationError
@@ -86,7 +41,12 @@ function handleNewClassroom() {
 }
 
 function renderRoute(route) {
-  if (route.name === 'tracker' || route.name === 'settings') {
+  if (
+    route.name === 'tracker' ||
+    route.name === 'settings' ||
+    route.name === 'setup' ||
+    route.name === 'studentProfile'
+  ) {
     const classroom = workspaceService.getClassroomById(route.classroomId);
     if (!classroom) {
       router.navigate('/');
@@ -98,8 +58,9 @@ function renderRoute(route) {
         classroom,
         onBack: () => router.navigate('/'),
         onSettings: () => router.navigate(`/classroom/${classroom.id}/settings`),
+        onSelectStudent: (studentId) => router.navigate(`/classroom/${classroom.id}/student/${studentId}`),
       });
-    } else {
+    } else if (route.name === 'settings') {
       renderSettingsView(appContainer, {
         classroom,
         section: route.section,
@@ -107,6 +68,21 @@ function renderRoute(route) {
         onNavigateSection: (section) =>
           router.navigate(`/classroom/${classroom.id}/settings/${section}`),
         onDeleted: () => router.navigate('/'),
+        onReopenSetupWizard: () => router.navigate(`/classroom/${classroom.id}/setup`),
+      });
+    } else if (route.name === 'setup') {
+      renderSetupWizardView(appContainer, {
+        classroom,
+        step: route.step,
+        onNavigateStep: (step) =>
+          router.navigate(step ? `/classroom/${classroom.id}/setup/${step}` : `/classroom/${classroom.id}/setup`),
+        onFinish: () => router.navigate(`/classroom/${classroom.id}`),
+      });
+    } else {
+      renderStudentProfileView(appContainer, {
+        classroom,
+        studentId: route.studentId,
+        onBack: () => router.navigate(`/classroom/${classroom.id}`),
       });
     }
     return;
