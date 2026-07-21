@@ -1,13 +1,17 @@
 /**
  * main.js
  *
- * Application entry point. Initialises the Workspace, wires up the
- * router, and renders whichever view/screen the current route calls for
- * (Welcome, Home, Tracker, Settings, Setup Wizard, Student Profile, or
- * Learning Activities).
+ * Application entry point. Sprint 4 adds an auth gate in front of
+ * everything else: the router is registered once, but renderRoute()
+ * checks the current signed-in teacher (kept in sync by
+ * services/authService.js's auth state listener) before deciding
+ * whether to show the Login screen or the normal app. No view or
+ * component ever calls Firebase directly — only this file and
+ * authService.js do.
  */
 
 import * as workspaceService from './services/workspaceService.js';
+import * as authService from './services/authService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
@@ -17,9 +21,26 @@ import { renderSettingsView } from './ui/views/SettingsView.js';
 import { renderSetupWizardView } from './ui/views/SetupWizardView.js';
 import { renderStudentProfileView } from './ui/views/StudentProfileView.js';
 import { renderActivitiesListView, renderActivityRosterView } from './ui/views/ActivitiesView.js';
+import { renderLoginView } from './ui/views/LoginView.js';
+import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
 
 let appContainer = null;
+let userBarContainer = null;
+let currentUser = null;
+
+function handleSignIn() {
+  authService.signInWithGoogle().catch((error) => {
+    console.error('[main] Sign-in failed:', error);
+    window.alert('Sign-in didn\u2019t complete. Please try again.');
+  });
+}
+
+function handleSignOut() {
+  authService.signOutUser().catch((error) => {
+    console.error('[main] Sign-out failed:', error);
+  });
+}
 
 function handleNewClassroom() {
   openNewClassroomModal({
@@ -49,6 +70,14 @@ const CLASSROOM_ROUTE_NAMES = [
 ];
 
 function renderRoute(route) {
+  if (!currentUser) {
+    userBarContainer.innerHTML = '';
+    renderLoginView(appContainer, { onSignIn: handleSignIn });
+    return;
+  }
+
+  renderUserBar(userBarContainer, { user: currentUser, onSignOut: handleSignOut });
+
   if (CLASSROOM_ROUTE_NAMES.includes(route.name)) {
     const classroom = workspaceService.getClassroomById(route.classroomId);
     if (!classroom) {
@@ -121,9 +150,18 @@ function renderRoute(route) {
 
 function init() {
   appContainer = document.getElementById('app');
-  workspaceService.init();
+  userBarContainer = document.getElementById('user-bar');
+
+  // Registered once — renderRoute() itself checks auth state on every
+  // call, so this doesn't need to be re-attached on sign-in/sign-out.
   router.onRouteChange(renderRoute);
-  renderRoute(router.getCurrentRoute());
+
+  authService.initAuth();
+  authService.onAuthStateChange((user) => {
+    currentUser = user;
+    if (user) workspaceService.init();
+    renderRoute(router.getCurrentRoute());
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);

@@ -119,9 +119,12 @@ or scoring rules later without reshaping existing data.
 
 ## Getting Started
 
-This project has no build step and no external dependencies. All you need is
-a modern web browser and a local static file server (to avoid `file://`
-CORS restrictions).
+This project has no build step. As of Sprint 4 it has one external
+runtime dependency — Firebase Authentication, loaded via CDN for Google
+Sign-In — everything else is still plain HTML/CSS/vanilla JS. You'll
+need a modern web browser and a local static file server (to avoid
+`file://` CORS restrictions, and because Google Sign-In requires a real
+`http(s)://` origin).
 
 ### 1. Clone the repository
 
@@ -130,7 +133,22 @@ git clone <repository-url>
 cd classroom-tracker
 ```
 
-### 2. Serve the project locally
+### 2. Set up Firebase Authentication
+
+The app won't sign anyone in until this is done — see
+[`src/js/config/firebaseConfig.js`](src/js/config/firebaseConfig.js) for
+the full checklist:
+
+1. Create (or open) a project at the
+   [Firebase console](https://console.firebase.google.com).
+2. Project Settings → General → "Your apps" → add a Web app, and copy
+   its config object into `firebaseConfig.js`, replacing the
+   placeholders.
+3. Authentication → Sign-in method → enable **Google**.
+4. Authentication → Settings → Authorized domains → add whatever domain
+   you're serving the app from (`localhost` is included by default).
+
+### 3. Serve the project locally
 
 Any static file server works. For example, using Python:
 
@@ -147,7 +165,7 @@ npx http-server src -p 8000
 
 Then open `http://localhost:8000` in your browser.
 
-### 3. Formatting
+### 4. Formatting
 
 This project uses [Prettier](https://prettier.io) for consistent code
 formatting. Configuration lives in `.prettierrc`. If you have Prettier

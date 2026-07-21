@@ -5,6 +5,12 @@
   screen (Welcome, Home, Tracker, Settings) is rendered into #app by
   main.js based on the current route (see ui/router.js). See
   docs/problem-statement.md and README.md for the full picture.
+
+  Sprint 4: Google Authentication (Firebase Auth) sits in front of all
+  of that. #user-bar is a small persistent strip (avatar/name/Sign Out)
+  shown above #app once a teacher is signed in — see
+  services/authService.js and ui/components/UserBar.js. If no one is
+  signed in, #app shows ui/views/LoginView.js instead of the router.
 -->
 <html lang="en">
   <head>
@@ -18,6 +24,7 @@
     <link rel="stylesheet" href="css/styles.css" />
   </head>
   <body>
+    <div id="user-bar"></div>
     <div id="app"></div>
 
     <script type="module" src="js/main.js"></script>
