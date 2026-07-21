@@ -1,46 +1,46 @@
 /**
  * services/studentService.js
  *
- * Business logic for the student roster. Holds the in-memory list of
- * students for the current session; sessionService is responsible for
- * loading/persisting this list via storage.
+ * Operations on the Students that belong to a single Team (see
+ * models/Team.js). Students live nested inside `team.students`, so every
+ * function here takes the team (or classroom, for cross-team lookups/
+ * resets) it should operate on.
  */
 
 import { createStudent } from '../models/Student.js';
 
-let students = [];
-
-export function initStudents(studentDefs = []) {
-  students = studentDefs.map((def) => createStudent(def));
-  return students;
-}
-
-export function replaceStudents(newStudents = []) {
-  students = newStudents;
-  return students;
-}
-
-export function listStudents() {
-  return students;
-}
-
-export function listStudentsByTeam(teamId) {
-  return students.filter((student) => student.teamId === teamId);
-}
-
-export function getStudentById(id) {
-  return students.find((student) => student.id === id) || null;
-}
-
-export function addPointsToStudent(id, delta) {
-  const student = getStudentById(id);
-  if (student) student.points += delta;
+export function addStudent(team, name) {
+  const student = createStudent({ name });
+  team.students.push(student);
   return student;
 }
 
-export function resetStudentsPoints() {
-  students.forEach((student) => {
-    student.points = 0;
+export function renameStudent(team, studentId, newName) {
+  const student = team.students.find((s) => s.id === studentId);
+  if (student) student.name = newName;
+  return student;
+}
+
+export function removeStudent(team, studentId) {
+  const before = team.students.length;
+  team.students = team.students.filter((student) => student.id !== studentId);
+  return team.students.length < before;
+}
+
+/** Finds a student by id across every team in a classroom. */
+export function findStudentInClassroom(classroom, studentId) {
+  for (const team of classroom.teams) {
+    const student = team.students.find((s) => s.id === studentId);
+    if (student) return { student, team };
+  }
+  return null;
+}
+
+/** Zeroes every student's score across every team in a classroom. */
+export function resetAllScores(classroom) {
+  classroom.teams.forEach((team) => {
+    team.students.forEach((student) => {
+      student.score = 0;
+    });
   });
-  return students;
 }

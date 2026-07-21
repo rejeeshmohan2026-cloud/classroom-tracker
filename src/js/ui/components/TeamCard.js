@@ -1,15 +1,13 @@
 /**
  * ui/components/TeamCard.js
  *
- * Renders one team card: a header with the team name and running total,
- * and a list of students, each a clickable row that awards that student a
- * point. Rendering only — no business logic; clicks are forwarded to
- * whatever handler the caller supplies.
- *
- * Added in Sprint 1.
+ * Renders one team card: a header with the team name and total score, and
+ * a read-only list of students and their scores. No click handling —
+ * awarding points is a future milestone (this one is architecture/UI
+ * foundation only). Rendering only, no business logic.
  */
 
-export function createTeamCardElement(team, students, { onStudentClick } = {}) {
+export function createTeamCardElement(team, teamScore) {
   const card = document.createElement('article');
   card.className = 'team-card';
   card.dataset.teamId = team.id;
@@ -23,42 +21,33 @@ export function createTeamCardElement(team, students, { onStudentClick } = {}) {
 
   const total = document.createElement('span');
   total.className = 'team-card__total';
-  total.textContent = String(team.points);
-  total.setAttribute('aria-label', `${team.name} total points`);
+  total.textContent = String(teamScore);
+  total.setAttribute('aria-label', `${team.name} total score`);
 
   header.append(title, total);
 
   const list = document.createElement('ul');
   list.className = 'student-list';
-  students.forEach((student) => {
-    list.appendChild(createStudentRowElement(student, { onClick: onStudentClick }));
+  team.students.forEach((student) => {
+    list.appendChild(createStudentRowElement(student));
   });
 
   card.append(header, list);
   return card;
 }
 
-function createStudentRowElement(student, { onClick } = {}) {
+function createStudentRowElement(student) {
   const item = document.createElement('li');
   item.className = 'student-row';
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'student-row__button';
-  button.dataset.studentId = student.id;
-  button.setAttribute('aria-label', `Award a point to ${student.name}`);
 
   const name = document.createElement('span');
   name.className = 'student-row__name';
   name.textContent = student.name;
 
-  const points = document.createElement('span');
-  points.className = 'student-row__points';
-  points.textContent = String(student.points);
+  const score = document.createElement('span');
+  score.className = 'student-row__points';
+  score.textContent = String(student.score);
 
-  button.append(name, points);
-  button.addEventListener('click', () => onClick?.(student.id));
-
-  item.appendChild(button);
+  item.append(name, score);
   return item;
 }

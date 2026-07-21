@@ -1,32 +1,30 @@
 /**
  * services/sessionService.js
  *
- * Orchestrates a Classroom Tracker session: loading a saved session (or
- * seeding the default demo roster on first run), awarding points, undoing
- * the last point, resetting the session, and persisting after every
- * mutation. This is the only module the UI layer talks to — it composes
- * classroomService, studentService, and eventService, and hides storage
- * behind a single load/save boundary (storageAdapter.js /
- * localStorageAdapter.js).
- *
- * Added in Sprint 1 alongside the roster/event services it coordinates.
+ * Orchestrates a Classroom Tracker session: loading a saved session (if
+ * one exists), importing a classroom roster from CSV (Sprint 1A),
+ * awarding points, undoing the last point, resetting the session, and
+ * persisting after every mutation. This is the only module the UI layer
+ * talks to — it composes classroomService, studentService, and
+ * eventService, and hides storage behind a single load/save boundary
+ * (storageAdapter.js / localStorageAdapter.js).
  */
 
-import { DEFAULT_TEAMS, STORAGE_KEY } from '../config/appConfig.js';
+import { STORAGE_KEY } from '../config/appConfig.js';
 import { localStorageAdapter } from '../storage/localStorageAdapter.js';
 import { generateId } from '../utils/idGenerator.js';
 import * as classroomService from './classroomService.js';
 import * as studentService from './studentService.js';
 import * as eventService from './eventService.js';
 
-function buildDefaultState() {
-  const teamRecords = DEFAULT_TEAMS.map((def) => ({
+function buildStateFromTeams(teamsWithStudents) {
+  const teamRecords = teamsWithStudents.map((def) => ({
     id: generateId(),
     name: def.name,
   }));
   classroomService.initTeams(teamRecords);
 
-  const studentRecords = DEFAULT_TEAMS.flatMap((def, index) => {
+  const studentRecords = teamsWithStudents.flatMap((def, index) => {
     const teamId = teamRecords[index].id;
     return def.students.map((name) => ({ id: generateId(), name, teamId }));
   });
@@ -48,9 +46,10 @@ function persist() {
 }
 
 /**
- * Loads a previously saved session from storage, or seeds the default
- * demo roster if none exists yet. Must be called once before the UI reads
- * state. Returns the initial state for rendering.
+ * Loads a previously saved session from storage, if one exists. If no
+ * classroom has been imported yet, returns an empty roster — Sprint 1A
+ * removed the hardcoded demo roster in favour of CSV import (see
+ * services/classroomImportService.js).
  */
 export function init() {
   const saved = localStorageAdapter.get(STORAGE_KEY);
@@ -61,11 +60,32 @@ export function init() {
     studentService.replaceStudents(saved.students || []);
     eventService.replaceEvents(saved.events || []);
   } else {
-    buildDefaultState();
-    persist();
+    classroomService.replaceTeams([]);
+    studentService.replaceStudents([]);
+    eventService.clearEvents();
   }
 
   return getState();
+}
+
+/**
+ * Replaces the current roster with a freshly imported one (fresh IDs,
+ * zeroed points, cleared event log), persists it, and returns the new
+ * state. Callers are responsible for confirming with the user first if a
+ * classroom is already loaded — see hasClassroom().
+ */
+export function importClassroom(teamsWithStudents) {
+  buildStateFromTeams(teamsWithStudents);
+  persist();
+  return getState();
+}
+
+/**
+ * Whether a classroom (any teams at all) is currently loaded. Used by the
+ * UI to decide whether to confirm before an import would replace it.
+ */
+export function hasClassroom() {
+  return classroomService.listTeams().length > 0;
 }
 
 /**

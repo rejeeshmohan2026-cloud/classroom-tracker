@@ -1,43 +1,81 @@
 /**
  * services/classroomService.js
  *
- * Business logic for the team roster (backed by models/Classroom.js — see
- * that file for why the model keeps the "Classroom" name). Holds the
- * in-memory list of teams for the current session; sessionService is
- * responsible for loading/persisting this list via storage.
+ * Holds the in-memory list of Classrooms for the current Workspace and
+ * exposes classroom-level operations (create, rename, delete, list).
+ * workspaceService is responsible for loading/persisting this list via
+ * storage — this module only manages it in memory and builds new
+ * Classroom records.
  */
 
-import { createTeam } from '../models/Classroom.js';
+import { createClassroom } from '../models/Classroom.js';
+import { createTeam } from '../models/Team.js';
+import { createStudent } from '../models/Student.js';
 
-let teams = [];
+let classrooms = [];
 
-export function initTeams(teamDefs = []) {
-  teams = teamDefs.map((def) => createTeam(def));
-  return teams;
+export function replaceClassrooms(newClassrooms = []) {
+  classrooms = newClassrooms;
+  return classrooms;
 }
 
-export function replaceTeams(newTeams = []) {
-  teams = newTeams;
-  return teams;
+export function listClassrooms() {
+  return classrooms;
 }
 
-export function listTeams() {
-  return teams;
+export function getClassroomById(id) {
+  return classrooms.find((classroom) => classroom.id === id) || null;
 }
 
-export function getTeamById(id) {
-  return teams.find((team) => team.id === id) || null;
+/**
+ * Creates an empty classroom (no teams, no members yet) — the "Create
+ * Manually" path from the New Classroom flow. Teams and students are
+ * added afterwards via Settings > Groups / Settings > Students.
+ */
+export function createEmptyClassroom(name) {
+  const classroom = createClassroom({ name });
+  classrooms.push(classroom);
+  return classroom;
 }
 
-export function addPointsToTeam(id, delta) {
-  const team = getTeamById(id);
-  if (team) team.points += delta;
-  return team;
+/**
+ * Creates a classroom from parsed CSV team/student names (see
+ * services/classroomImportService.js), with every score starting at
+ * zero. Used by the "Import Classroom" path.
+ */
+export function createClassroomFromImport(name, teamsWithStudentNames) {
+  const teams = teamsWithStudentNames.map((teamDef) =>
+    createTeam({
+      name: teamDef.name,
+      students: teamDef.students.map((studentName) =>
+        createStudent({ name: studentName })
+      ),
+    })
+  );
+
+  const classroom = createClassroom({ name, teams });
+  classrooms.push(classroom);
+  return classroom;
 }
 
-export function resetTeamsPoints() {
-  teams.forEach((team) => {
-    team.points = 0;
-  });
-  return teams;
+export function renameClassroom(id, newName) {
+  const classroom = getClassroomById(id);
+  if (classroom) classroom.name = newName;
+  return classroom;
+}
+
+export function deleteClassroom(id) {
+  const before = classrooms.length;
+  classrooms = classrooms.filter((classroom) => classroom.id !== id);
+  return classrooms.length < before;
+}
+
+/** Total number of students across every team in a classroom. */
+export function getStudentCount(classroom) {
+  return classroom.teams.reduce((sum, team) => sum + team.students.length, 0);
+}
+
+/** Total number of members (administrators + teachers) in a classroom. */
+export function getMemberCount(classroom) {
+  return classroom.administrators.length + classroom.teachers.length;
 }

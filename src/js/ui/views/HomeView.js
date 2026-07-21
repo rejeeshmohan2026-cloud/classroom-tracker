@@ -1,0 +1,49 @@
+/**
+ * ui/views/HomeView.js
+ *
+ * The "My Classrooms" dashboard, shown once at least one classroom
+ * exists. Computes each card's student/teacher counts via
+ * classroomService's read-only selectors and hands plain numbers down to
+ * the ClassroomCard component (which stays props-only).
+ */
+
+import { createClassroomCardElement } from '../components/ClassroomCard.js';
+import { getStudentCount, getMemberCount } from '../../services/classroomService.js';
+
+export function renderHomeView(container, { classrooms, onSelectClassroom, onNewClassroom }) {
+  container.innerHTML = '';
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'home-view';
+
+  const header = document.createElement('div');
+  header.className = 'home-view__header';
+
+  const title = document.createElement('h1');
+  title.className = 'home-view__title';
+  title.textContent = 'My Classrooms';
+
+  const newButton = document.createElement('button');
+  newButton.type = 'button';
+  newButton.className = 'btn btn--primary';
+  newButton.textContent = '+ New Classroom';
+  newButton.addEventListener('click', onNewClassroom);
+
+  header.append(title, newButton);
+
+  const grid = document.createElement('div');
+  grid.className = 'classroom-grid';
+
+  classrooms.forEach((classroom) => {
+    const card = createClassroomCardElement({
+      name: classroom.name,
+      studentCount: getStudentCount(classroom),
+      memberCount: getMemberCount(classroom),
+      onClick: () => onSelectClassroom(classroom.id),
+    });
+    grid.appendChild(card);
+  });
+
+  wrapper.append(header, grid);
+  container.appendChild(wrapper);
+}

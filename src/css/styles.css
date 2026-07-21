@@ -1,11 +1,9 @@
 /*
- * Global stylesheet — Sprint 1.
+ * Global stylesheet — Product Architecture Refactor.
  *
  * Palette and type follow Teach For India brand guidelines: TFI Cyan as
  * the primary accent, Open Sans throughout, black/near-black text on
- * white/light-neutral surfaces. Layout is a responsive card grid that
- * collapses to a single column on small screens without needing extra
- * breakpoints (auto-fit + minmax).
+ * white/light-neutral surfaces.
  */
 
 :root {
@@ -14,6 +12,7 @@
   --color-yellow: #ffd337;
   --color-danger: #e15344;
   --color-ink: #1a1a1a;
+  --color-muted: #55606a;
   --color-bg: #f5f8fa;
   --color-surface: #ffffff;
   --color-border: #e2e8ed;
@@ -35,31 +34,13 @@ body {
   color: var(--color-ink);
 }
 
-/* Header */
-
-.app-header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+input,
+select {
+  font-family: inherit;
+  font-size: 0.95rem;
 }
 
-.app-header__title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  margin: 0;
-}
-
-.app-header__actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-/* Buttons */
+/* Buttons (shared across every screen) */
 
 .btn {
   font-family: inherit;
@@ -83,6 +64,16 @@ body {
   transform: none;
 }
 
+.btn--primary {
+  background-color: var(--color-cyan);
+  border-color: var(--color-cyan);
+  color: var(--color-surface);
+}
+.btn--primary:hover:not(:disabled) {
+  background-color: var(--color-cyan-dark);
+  border-color: var(--color-cyan-dark);
+}
+
 .btn--ghost {
   border-color: var(--color-cyan);
   color: var(--color-cyan-dark);
@@ -99,21 +90,204 @@ body {
   background-color: rgba(225, 83, 68, 0.08);
 }
 
+.btn--text {
+  color: var(--color-ink);
+  padding: 0.6rem 0.5rem;
+}
+.btn--text:hover:not(:disabled) {
+  color: var(--color-cyan-dark);
+}
+
+.btn--danger-text {
+  color: var(--color-danger);
+}
+.btn--danger-text:hover:not(:disabled) {
+  color: #b8382c;
+}
+
+.btn--large {
+  font-size: 1.05rem;
+  padding: 0.85rem 1.75rem;
+}
+
 .btn:focus-visible,
-.student-row__button:focus-visible {
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid var(--color-yellow);
   outline-offset: 2px;
 }
 
-/* Team grid + cards */
+/* Welcome view (first launch, no classrooms yet) */
+
+.welcome-view {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 1rem;
+}
+
+.welcome-view__title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.welcome-view__subtitle {
+  font-size: 1rem;
+  color: var(--color-muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+/* Home view (classroom dashboard) */
+
+.home-view {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.home-view__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.home-view__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.classroom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.classroom-card {
+  text-align: left;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 1.25rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+.classroom-card:hover {
+  border-color: var(--color-cyan);
+  transform: translateY(-2px);
+}
+
+.classroom-card__name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0 0 0.35rem;
+}
+
+.classroom-card__meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* Modal (New Classroom) */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(26, 26, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.modal__heading {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.modal__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: 1.25rem;
+}
+
+.modal__input {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Tracker view */
+
+.tracker-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tracker-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tracker-header__title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0;
+  flex: 1;
+}
+
+.tracker-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
 
 .team-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1.25rem;
   padding: 1.5rem;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .team-card {
@@ -151,42 +325,25 @@ body {
   text-align: center;
 }
 
-/* Student list */
-
 .student-list {
   list-style: none;
   margin: 0;
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.25rem;
 }
 
-.student-row__button {
-  width: 100%;
+.student-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  background-color: transparent;
-  border: 1px solid var(--color-border);
+  padding: 0.6rem 0.85rem;
   border-radius: var(--radius-control);
-  font-family: inherit;
-  font-size: 0.95rem;
-  color: var(--color-ink);
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
-    transform 0.1s ease;
 }
-
-.student-row__button:hover {
-  background-color: rgba(14, 192, 226, 0.08);
-  border-color: var(--color-cyan);
-}
-
-.student-row__button:active {
-  transform: scale(0.98);
+.student-row:nth-child(odd) {
+  background-color: var(--color-bg);
 }
 
 .student-row__name {
@@ -200,24 +357,208 @@ body {
   text-align: right;
 }
 
+/* Empty state (no classroom imported yet / no teams in a classroom) */
+
+.empty-state {
+  grid-column: 1 / -1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.empty-state__message {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+/* Settings view */
+
+.settings-view {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-header__title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem 0;
+}
+
+.settings-tabs__tab {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.55rem 0.9rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.settings-tabs__tab--active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-cyan);
+}
+
+.settings-content {
+  padding: 1.5rem;
+}
+
+.settings-section {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1.5rem;
+}
+
+.settings-section--danger {
+  border-color: var(--color-danger);
+}
+
+.settings-section__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.settings-section__input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.settings-section__meta {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin: 1rem 0 0;
+}
+
+.settings-team-block {
+  margin-bottom: 1.75rem;
+}
+.settings-team-block:last-child {
+  margin-bottom: 0;
+}
+
+.settings-team-block__heading {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 0.6rem;
+}
+
+.settings-editable-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-editable-list__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.settings-editable-list__item input[type='text'] {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.member-row__label {
+  flex: 1;
+  font-weight: 600;
+}
+
+.settings-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.settings-add-form input[type='text'] {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.settings-add-form select {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.permissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.permissions-table th,
+.permissions-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.permissions-table__cell {
+  text-align: center;
+}
+
 /* Accessibility & responsiveness */
 
 @media (prefers-reduced-motion: reduce) {
   .btn,
-  .student-row__button {
+  .classroom-card {
     transition: none;
   }
-  .btn:active,
-  .student-row__button:active {
+  .btn:active {
+    transform: none;
+  }
+  .classroom-card:hover {
     transform: none;
   }
 }
 
 @media (max-width: 480px) {
-  .app-header {
+  .tracker-header,
+  .settings-header {
     padding: 1rem;
   }
-  .team-grid {
+  .team-grid,
+  .settings-content,
+  .home-view {
     padding: 1rem;
   }
 }

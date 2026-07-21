@@ -1,47 +1,95 @@
 /**
  * main.js
  *
- * Application entry point. Wires sessionService (roster + points + undo +
- * persistence) to the DOM: mounts the renderer, attaches the Undo/Reset
- * button handlers, loads the saved (or default) session, and renders it.
+ * Application entry point. Initialises the Workspace, wires up the
+ * router, and renders whichever view the current route calls for
+ * (Welcome, Home, Tracker, or Settings). The "+ New Classroom" flow
+ * (modal -> import or manual create -> navigate to the new classroom) is
+ * owned here since it's triggered from more than one view.
  */
 
-import * as sessionService from './services/sessionService.js';
-import * as renderer from './ui/renderer.js';
+import * as workspaceService from './services/workspaceService.js';
+import { parseClassroomCsv, ClassroomImportError } from './services/classroomImportService.js';
+import * as router from './ui/router.js';
+import { renderWelcomeView } from './ui/views/WelcomeView.js';
+import { renderHomeView } from './ui/views/HomeView.js';
+import { renderTrackerView } from './ui/views/TrackerView.js';
+import { renderSettingsView } from './ui/views/SettingsView.js';
+import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
 
-function renderState(state, undoButton) {
-  renderer.render(state);
-  renderer.setUndoEnabled(undoButton, sessionService.canUndo());
+let appContainer = null;
+
+function handleNewClassroom() {
+  openNewClassroomModal({
+    onImport: async (name, file, close) => {
+      let teamsWithStudents;
+      try {
+        const csvText = await file.text();
+        teamsWithStudents = parseClassroomCsv(csvText);
+      } catch (error) {
+        const message =
+          error instanceof ClassroomImportError
+            ? error.message
+            : 'Something went wrong reading that file. Please check the CSV and try again.';
+        window.alert(message);
+        return;
+      }
+      const classroom = workspaceService.importClassroom(name, teamsWithStudents);
+      close();
+      router.navigate(`/classroom/${classroom.id}`);
+    },
+    onCreateManually: (name, close) => {
+      const classroom = workspaceService.createClassroomManually(name);
+      close();
+      router.navigate(`/classroom/${classroom.id}`);
+    },
+  });
+}
+
+function renderRoute(route) {
+  if (route.name === 'tracker' || route.name === 'settings') {
+    const classroom = workspaceService.getClassroomById(route.classroomId);
+    if (!classroom) {
+      router.navigate('/');
+      return;
+    }
+
+    if (route.name === 'tracker') {
+      renderTrackerView(appContainer, {
+        classroom,
+        onBack: () => router.navigate('/'),
+        onSettings: () => router.navigate(`/classroom/${classroom.id}/settings`),
+      });
+    } else {
+      renderSettingsView(appContainer, {
+        classroom,
+        section: route.section,
+        onBack: () => router.navigate(`/classroom/${classroom.id}`),
+        onNavigateSection: (section) =>
+          router.navigate(`/classroom/${classroom.id}/settings/${section}`),
+        onDeleted: () => router.navigate('/'),
+      });
+    }
+    return;
+  }
+
+  const { classrooms } = workspaceService.getState();
+  if (classrooms.length === 0) {
+    renderWelcomeView(appContainer, { onNewClassroom: handleNewClassroom });
+  } else {
+    renderHomeView(appContainer, {
+      classrooms,
+      onSelectClassroom: (id) => router.navigate(`/classroom/${id}`),
+      onNewClassroom: handleNewClassroom,
+    });
+  }
 }
 
 function init() {
-  const cardsContainer = document.getElementById('team-cards');
-  const undoButton = document.getElementById('undo-btn');
-  const resetButton = document.getElementById('reset-btn');
-
-  renderer.mount(cardsContainer, {
-    onStudentClick: (studentId) => {
-      const state = sessionService.awardPoint(studentId);
-      renderState(state, undoButton);
-    },
-  });
-
-  undoButton.addEventListener('click', () => {
-    const state = sessionService.undo();
-    renderState(state, undoButton);
-  });
-
-  resetButton.addEventListener('click', () => {
-    const confirmed = window.confirm(
-      'Reset all points for this session? This cannot be undone.'
-    );
-    if (!confirmed) return;
-    const state = sessionService.resetSession();
-    renderState(state, undoButton);
-  });
-
-  const initialState = sessionService.init();
-  renderState(initialState, undoButton);
+  appContainer = document.getElementById('app');
+  workspaceService.init();
+  router.onRouteChange(renderRoute);
+  renderRoute(router.getCurrentRoute());
 }
 
 document.addEventListener('DOMContentLoaded', init);

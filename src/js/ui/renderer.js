@@ -8,6 +8,7 @@
  */
 
 import { createTeamCardElement } from './components/TeamCard.js';
+import { createEmptyStateElement } from './components/EmptyState.js';
 
 let container = null;
 let handlers = {};
@@ -21,6 +22,11 @@ export function render(state) {
   if (!container) return;
 
   container.innerHTML = '';
+
+  if (!state.teams.length) {
+    container.appendChild(createEmptyStateElement());
+    return;
+  }
 
   state.teams.forEach((team) => {
     const studentsForTeam = state.students.filter((student) => student.teamId === team.id);
