@@ -1,11 +1,15 @@
 /**
  * ui/components/NewClassroomModal.js
  *
- * The "+ New Classroom" modal: collects a classroom name, then either
- * triggers a CSV file picker (Import Classroom) or creates an empty
- * classroom immediately (Create Manually). Rendering + wiring only — the
- * actual import parsing and classroom creation are handled by the
- * callbacks the caller supplies (see main.js), not by this component.
+ * The "+ New Classroom" modal: collects classroom details (School Name
+ * and Grade / Section required; Classroom Name, Academic Year, and
+ * Description optional), then either triggers a CSV file picker (Import
+ * Classroom) or creates an empty classroom immediately (Create
+ * Manually). Rendering + wiring only — the actual import parsing and
+ * classroom creation are handled by the callbacks the caller supplies
+ * (see main.js), not by this component. Required-field validation here
+ * is just for immediate feedback; classroomService validates again
+ * before anything is created.
  */
 
 export function openNewClassroomModal({ onImport, onCreateManually }) {
@@ -22,15 +26,32 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
   heading.className = 'modal__heading';
   heading.textContent = 'New Classroom';
 
-  const label = document.createElement('label');
-  label.className = 'modal__label';
-  label.textContent = 'Classroom name';
+  const form = document.createElement('div');
+  form.className = 'modal__form';
 
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.className = 'modal__input';
-  nameInput.placeholder = 'e.g. Class VIII-A';
-  label.appendChild(nameInput);
+  const schoolNameInput = createField(form, {
+    label: 'School Name',
+    required: true,
+    placeholder: 'e.g. CHS Kannamapet',
+  });
+  const gradeSectionInput = createField(form, {
+    label: 'Grade / Section',
+    required: true,
+    placeholder: 'e.g. Grade 8A',
+  });
+  const classroomNameInput = createField(form, {
+    label: 'Classroom Name (optional)',
+    placeholder: 'e.g. Bloom Force 19',
+  });
+  const academicYearInput = createField(form, {
+    label: 'Academic Year (optional)',
+    placeholder: 'e.g. 2026\u201327',
+  });
+  const descriptionInput = createField(form, {
+    label: 'Description (optional)',
+    placeholder: 'Optional notes about the classroom',
+    multiline: true,
+  });
 
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
@@ -59,18 +80,32 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
     overlay.remove();
   }
 
-  function requireName() {
-    const name = nameInput.value.trim();
-    if (!name) {
-      window.alert('Please enter a classroom name first.');
-      nameInput.focus();
+  function readDetails() {
+    const schoolName = schoolNameInput.value.trim();
+    const gradeSection = gradeSectionInput.value.trim();
+
+    if (!schoolName) {
+      window.alert('School Name is required.');
+      schoolNameInput.focus();
       return null;
     }
-    return name;
+    if (!gradeSection) {
+      window.alert('Grade / Section is required.');
+      gradeSectionInput.focus();
+      return null;
+    }
+
+    return {
+      schoolName,
+      gradeSection,
+      classroomName: classroomNameInput.value.trim(),
+      academicYear: academicYearInput.value.trim(),
+      description: descriptionInput.value.trim(),
+    };
   }
 
   importButton.addEventListener('click', () => {
-    if (!requireName()) return;
+    if (!readDetails()) return;
     fileInput.click();
   });
 
@@ -78,15 +113,15 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
     const file = event.target.files[0];
     fileInput.value = '';
     if (!file) return;
-    const name = requireName();
-    if (!name) return;
-    onImport(name, file, close);
+    const details = readDetails();
+    if (!details) return;
+    onImport(details, file, close);
   });
 
   manualButton.addEventListener('click', () => {
-    const name = requireName();
-    if (!name) return;
-    onCreateManually(name, close);
+    const details = readDetails();
+    if (!details) return;
+    onCreateManually(details, close);
   });
 
   cancelButton.addEventListener('click', close);
@@ -95,9 +130,26 @@ export function openNewClassroomModal({ onImport, onCreateManually }) {
   });
 
   actions.append(importButton, manualButton, cancelButton);
-  modal.append(heading, label, actions, fileInput);
+  modal.append(heading, form, actions, fileInput);
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  nameInput.focus();
+  schoolNameInput.focus();
+}
+
+function createField(form, { label, placeholder, required = false, multiline = false }) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'modal__label';
+  wrapper.textContent = label;
+
+  const input = document.createElement(multiline ? 'textarea' : 'input');
+  if (!multiline) input.type = 'text';
+  input.className = 'modal__input';
+  input.placeholder = placeholder;
+  if (required) input.required = true;
+  if (multiline) input.rows = 3;
+
+  wrapper.appendChild(input);
+  form.appendChild(wrapper);
+  return input;
 }

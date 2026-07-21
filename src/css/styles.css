@@ -193,7 +193,13 @@ select:focus-visible {
 .classroom-card__name {
   font-size: 1.1rem;
   font-weight: 800;
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.25rem;
+}
+
+.classroom-card__subtitle {
+  margin: 0 0 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
 }
 
 .classroom-card__meta {
@@ -235,6 +241,10 @@ select:focus-visible {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.modal__form {
   margin-bottom: 1.25rem;
 }
 
@@ -245,6 +255,8 @@ select:focus-visible {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
+  font-family: inherit;
+  resize: vertical;
 }
 
 .modal__actions {
@@ -270,11 +282,21 @@ select:focus-visible {
   border-bottom: 1px solid var(--color-border);
 }
 
+.tracker-header__title-block {
+  flex: 1;
+  min-width: 160px;
+}
+
 .tracker-header__title {
   font-size: 1.3rem;
   font-weight: 800;
   margin: 0;
-  flex: 1;
+}
+
+.tracker-header__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
 }
 
 .tracker-header__actions {

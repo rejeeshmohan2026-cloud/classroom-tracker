@@ -8,7 +8,12 @@
  */
 
 import { createClassroomCardElement } from '../components/ClassroomCard.js';
-import { getStudentCount, getMemberCount } from '../../services/classroomService.js';
+import {
+  getStudentCount,
+  getMemberCount,
+  getDisplayName,
+  getDisplaySubtitle,
+} from '../../services/classroomService.js';
 
 export function renderHomeView(container, { classrooms, onSelectClassroom, onNewClassroom }) {
   container.innerHTML = '';
@@ -36,7 +41,8 @@ export function renderHomeView(container, { classrooms, onSelectClassroom, onNew
 
   classrooms.forEach((classroom) => {
     const card = createClassroomCardElement({
-      name: classroom.name,
+      displayName: getDisplayName(classroom),
+      subtitle: getDisplaySubtitle(classroom),
       studentCount: getStudentCount(classroom),
       memberCount: getMemberCount(classroom),
       onClick: () => onSelectClassroom(classroom.id),

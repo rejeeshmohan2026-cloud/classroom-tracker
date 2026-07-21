@@ -12,6 +12,7 @@
 import { createTeamCardElement } from '../components/TeamCard.js';
 import { createEmptyStateElement } from '../components/EmptyState.js';
 import { getTeamScore } from '../../services/teamService.js';
+import { getDisplayName, getDisplaySubtitle } from '../../services/classroomService.js';
 
 export function renderTrackerView(container, { classroom, onBack, onSettings }) {
   container.innerHTML = '';
@@ -28,9 +29,21 @@ export function renderTrackerView(container, { classroom, onBack, onSettings }) 
   backButton.textContent = '← Back';
   backButton.addEventListener('click', onBack);
 
+  const titleBlock = document.createElement('div');
+  titleBlock.className = 'tracker-header__title-block';
+
   const title = document.createElement('h1');
   title.className = 'tracker-header__title';
-  title.textContent = classroom.name;
+  title.textContent = getDisplayName(classroom);
+  titleBlock.appendChild(title);
+
+  const subtitle = getDisplaySubtitle(classroom);
+  if (subtitle) {
+    const subtitleEl = document.createElement('p');
+    subtitleEl.className = 'tracker-header__subtitle';
+    subtitleEl.textContent = subtitle;
+    titleBlock.appendChild(subtitleEl);
+  }
 
   const actions = document.createElement('div');
   actions.className = 'tracker-header__actions';
@@ -56,7 +69,7 @@ export function renderTrackerView(container, { classroom, onBack, onSettings }) 
   settingsButton.addEventListener('click', onSettings);
 
   actions.append(undoButton, resetButton, settingsButton);
-  header.append(backButton, title, actions);
+  header.append(backButton, titleBlock, actions);
 
   const grid = document.createElement('section');
   grid.className = 'team-grid';

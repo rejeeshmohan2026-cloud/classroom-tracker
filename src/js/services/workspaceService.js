@@ -41,20 +41,20 @@ export function getClassroomById(id) {
   return classroomService.getClassroomById(id);
 }
 
-export function createClassroomManually(name) {
-  const classroom = classroomService.createEmptyClassroom(name);
+export function createClassroomManually(details) {
+  const classroom = classroomService.createEmptyClassroom(details);
   persist();
   return classroom;
 }
 
-export function importClassroom(name, teamsWithStudentNames) {
-  const classroom = classroomService.createClassroomFromImport(name, teamsWithStudentNames);
+export function importClassroom(details, teamsWithStudentNames) {
+  const classroom = classroomService.createClassroomFromImport(details, teamsWithStudentNames);
   persist();
   return classroom;
 }
 
-export function renameClassroom(id, newName) {
-  const classroom = classroomService.renameClassroom(id, newName);
+export function updateClassroomDetails(id, updates) {
+  const classroom = classroomService.updateClassroomDetails(id, updates);
   persist();
   return classroom;
 }

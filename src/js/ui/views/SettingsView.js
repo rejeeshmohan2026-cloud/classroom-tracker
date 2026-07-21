@@ -17,6 +17,7 @@ import * as teamService from '../../services/teamService.js';
 import * as studentService from '../../services/studentService.js';
 import * as memberService from '../../services/memberService.js';
 import * as workspaceService from '../../services/workspaceService.js';
+import { getDisplayName, ClassroomValidationError } from '../../services/classroomService.js';
 import { MEMBER_ROLES, PERMISSIONS, ROLE_PERMISSIONS } from '../../config/memberRoles.js';
 
 const SECTIONS = ['general', 'students', 'groups', 'teachers', 'permissions', 'danger'];
@@ -49,7 +50,7 @@ export function renderSettingsView(container, { classroom, section, onBack, onNa
 
   const title = document.createElement('h1');
   title.className = 'settings-header__title';
-  title.textContent = `${classroom.name} \u00b7 Settings`;
+  title.textContent = `${getDisplayName(classroom)} \u00b7 Settings`;
 
   header.append(backButton, title);
 
@@ -88,29 +89,51 @@ function renderGeneralSection(content, classroom, rerender) {
   const section = document.createElement('div');
   section.className = 'settings-section';
 
-  const label = document.createElement('label');
-  label.className = 'settings-section__label';
-  label.textContent = 'Classroom name';
-
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'settings-section__input';
-  input.value = classroom.name;
-  label.appendChild(input);
+  const schoolNameInput = createLabeledInput(section, {
+    label: 'School Name',
+    value: classroom.schoolName,
+  });
+  const gradeSectionInput = createLabeledInput(section, {
+    label: 'Grade / Section',
+    value: classroom.gradeSection,
+  });
+  const classroomNameInput = createLabeledInput(section, {
+    label: 'Classroom Name (optional)',
+    value: classroom.classroomName,
+  });
+  const academicYearInput = createLabeledInput(section, {
+    label: 'Academic Year (optional)',
+    value: classroom.academicYear,
+  });
+  const descriptionInput = createLabeledInput(section, {
+    label: 'Description (optional)',
+    value: classroom.description,
+    multiline: true,
+  });
 
   const saveButton = document.createElement('button');
   saveButton.type = 'button';
   saveButton.className = 'btn btn--primary';
   saveButton.textContent = 'Save';
   saveButton.addEventListener('click', () => {
-    const newName = input.value.trim();
-    if (!newName) {
-      window.alert('Classroom name cannot be empty.');
-      return;
+    try {
+      workspaceService.updateClassroomDetails(classroom.id, {
+        schoolName: schoolNameInput.value.trim(),
+        gradeSection: gradeSectionInput.value.trim(),
+        classroomName: classroomNameInput.value.trim(),
+        academicYear: academicYearInput.value.trim(),
+        description: descriptionInput.value.trim(),
+      });
+      rerender();
+    } catch (error) {
+      const message =
+        error instanceof ClassroomValidationError
+          ? error.message
+          : 'Something went wrong saving these details.';
+      window.alert(message);
     }
-    workspaceService.renameClassroom(classroom.id, newName);
-    rerender();
   });
+  section.appendChild(saveButton);
 
   const createdAt = document.createElement('p');
   createdAt.className = 'settings-section__meta';
@@ -119,9 +142,25 @@ function renderGeneralSection(content, classroom, rerender) {
     month: 'short',
     year: 'numeric',
   })}`;
+  section.appendChild(createdAt);
 
-  section.append(label, saveButton, createdAt);
   content.appendChild(section);
+}
+
+function createLabeledInput(section, { label, value, multiline = false }) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'settings-section__label';
+  wrapper.textContent = label;
+
+  const input = document.createElement(multiline ? 'textarea' : 'input');
+  if (!multiline) input.type = 'text';
+  input.className = 'settings-section__input';
+  input.value = value || '';
+  if (multiline) input.rows = 3;
+
+  wrapper.appendChild(input);
+  section.appendChild(wrapper);
+  return input;
 }
 
 function renderStudentsSection(content, classroom, rerender) {
@@ -386,7 +425,7 @@ function renderDangerSection(content, classroom, onDeleted) {
   deleteButton.className = 'btn btn--danger';
   deleteButton.textContent = 'Delete classroom';
   deleteButton.addEventListener('click', () => {
-    const confirmed = window.confirm(`Delete "${classroom.name}"? This cannot be undone.`);
+    const confirmed = window.confirm(`Delete "${getDisplayName(classroom)}"? This cannot be undone.`);
     if (!confirmed) return;
     workspaceService.deleteClassroom(classroom.id);
     onDeleted();

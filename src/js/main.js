@@ -10,6 +10,7 @@
 
 import * as workspaceService from './services/workspaceService.js';
 import { parseClassroomCsv, ClassroomImportError } from './services/classroomImportService.js';
+import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
 import { renderHomeView } from './ui/views/HomeView.js';
@@ -21,7 +22,7 @@ let appContainer = null;
 
 function handleNewClassroom() {
   openNewClassroomModal({
-    onImport: async (name, file, close) => {
+    onImport: async (details, file, close) => {
       let teamsWithStudents;
       try {
         const csvText = await file.text();
@@ -34,14 +35,30 @@ function handleNewClassroom() {
         window.alert(message);
         return;
       }
-      const classroom = workspaceService.importClassroom(name, teamsWithStudents);
-      close();
-      router.navigate(`/classroom/${classroom.id}`);
+      try {
+        const classroom = workspaceService.importClassroom(details, teamsWithStudents);
+        close();
+        router.navigate(`/classroom/${classroom.id}`);
+      } catch (error) {
+        const message =
+          error instanceof ClassroomValidationError
+            ? error.message
+            : 'Something went wrong creating that classroom.';
+        window.alert(message);
+      }
     },
-    onCreateManually: (name, close) => {
-      const classroom = workspaceService.createClassroomManually(name);
-      close();
-      router.navigate(`/classroom/${classroom.id}`);
+    onCreateManually: (details, close) => {
+      try {
+        const classroom = workspaceService.createClassroomManually(details);
+        close();
+        router.navigate(`/classroom/${classroom.id}`);
+      } catch (error) {
+        const message =
+          error instanceof ClassroomValidationError
+            ? error.message
+            : 'Something went wrong creating that classroom.';
+        window.alert(message);
+      }
     },
   });
 }
