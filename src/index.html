@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!--
+  Sprint 1: team cards, student lists, point awarding, undo, reset, and
+  localStorage persistence. Markup here stays minimal and static (header,
+  buttons, an empty cards container) — the team cards themselves are built
+  dynamically by ui/renderer.js from session state, not hardcoded here.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Classroom Tracker</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="app-header__title">Classroom Tracker</h1>
+      <div class="app-header__actions">
+        <button type="button" id="undo-btn" class="btn btn--ghost">
+          Undo
+        </button>
+        <button type="button" id="reset-btn" class="btn btn--danger">
+          Reset session
+        </button>
+      </div>
+    </header>
+
+    <main id="app">
+      <section id="team-cards" class="team-grid" aria-label="Teams"></section>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

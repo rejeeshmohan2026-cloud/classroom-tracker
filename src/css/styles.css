@@ -1,0 +1,223 @@
+/*
+ * Global stylesheet — Sprint 1.
+ *
+ * Palette and type follow Teach For India brand guidelines: TFI Cyan as
+ * the primary accent, Open Sans throughout, black/near-black text on
+ * white/light-neutral surfaces. Layout is a responsive card grid that
+ * collapses to a single column on small screens without needing extra
+ * breakpoints (auto-fit + minmax).
+ */
+
+:root {
+  --color-cyan: #0ec0e2;
+  --color-cyan-dark: #0a94ae;
+  --color-yellow: #ffd337;
+  --color-danger: #e15344;
+  --color-ink: #1a1a1a;
+  --color-bg: #f5f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e8ed;
+
+  --radius-card: 14px;
+  --radius-control: 8px;
+  --shadow-card: 0 2px 10px rgba(15, 30, 40, 0.08);
+  --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+}
+
+/* Header */
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-header__title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.app-header__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Buttons */
+
+.btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius-control);
+  border: 2px solid transparent;
+  background-color: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn--ghost {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan-dark);
+}
+.btn--ghost:hover:not(:disabled) {
+  background-color: rgba(14, 192, 226, 0.1);
+}
+
+.btn--danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.btn--danger:hover:not(:disabled) {
+  background-color: rgba(225, 83, 68, 0.08);
+}
+
+.btn:focus-visible,
+.student-row__button:focus-visible {
+  outline: 3px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+/* Team grid + cards */
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  padding: 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.team-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  background-color: var(--color-cyan);
+  color: var(--color-surface);
+}
+
+.team-card__name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.team-card__total {
+  font-size: 1.3rem;
+  font-weight: 800;
+  background-color: rgba(255, 255, 255, 0.22);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  min-width: 2.25rem;
+  text-align: center;
+}
+
+/* Student list */
+
+.student-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.student-row__button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.student-row__button:hover {
+  background-color: rgba(14, 192, 226, 0.08);
+  border-color: var(--color-cyan);
+}
+
+.student-row__button:active {
+  transform: scale(0.98);
+}
+
+.student-row__name {
+  font-weight: 600;
+}
+
+.student-row__points {
+  font-weight: 800;
+  color: var(--color-cyan-dark);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* Accessibility & responsiveness */
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .student-row__button {
+    transition: none;
+  }
+  .btn:active,
+  .student-row__button:active {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 1rem;
+  }
+  .team-grid {
+    padding: 1rem;
+  }
+}

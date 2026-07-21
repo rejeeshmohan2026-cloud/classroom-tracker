@@ -1,58 +1,179 @@
-
-
-
 # Classroom Tracker
 
-A modern classroom management platform designed to help teachers run their classrooms efficiently with minimal friction.
+A lightweight, offline-first tool to help Teach For India Fellows track classroom
+performance, behavioural observations, and student progress — built with plain
+HTML, CSS, and vanilla JavaScript, with no external frameworks or backend
+dependencies.
 
-## Vision
-
-To build a real-time classroom operating system where teachers can:
-
-- Track participation in one tap
-- Record positive and negative behaviour instantly
-- Manage team-based classrooms
-- Recognize individual contributions
-- Take attendance
-- Manage assignments
-- Monitor student progress
-- Integrate seamlessly with Learning Hub
-
-## MVP
-
-The first version focuses on replacing the classroom whiteboard and spreadsheet.
-
-### Features
-
-- Live classroom tracker
-- One-tap participation tracking
-- Automatic team score calculation
-- Individual contribution history
-- Session history
-- Undo last action
-
-## Roadmap
-
-### Phase 1
-- Live Tracker
-- Team Scores
-- Student Profiles
-- Attendance
-
-### Phase 2
-- Assignments
-- Reports
-- Firebase Sync
-
-### Phase 3
-- Student Portal
-- Learning Hub Integration
-
-### Phase 4
-- Program Manager Dashboard
-- Parent Portal
-- Analytics
+> **Status:** Architecture scaffolding milestone. No features are implemented
+> yet — this milestone establishes the project structure only. See
+> [`docs/problem-statement.md`](docs/problem-statement.md) for the problem
+> this project aims to solve.
 
 ---
 
-Built for teachers. Optimized for real classrooms.
+## Project Structure
+
+```
+classroom-tracker/
+├── README.md                  # You are here
+├── CONTRIBUTING.md            # Guidelines for contributing to this project
+├── .editorconfig              # Consistent editor settings across the team
+├── .gitignore                 # Files and folders excluded from version control
+├── .prettierrc                # Code formatting rules
+│
+├── docs/
+│   └── problem-statement.md   # The problem this project solves, and who it's for
+│
+├── tests/                     # Test files (structure only — no tests yet)
+│
+├── assets/
+│   ├── icons/                 # Icon assets (not added yet)
+│   └── images/                # Static image assets (not added yet)
+│
+└── src/
+    ├── index.html              # Application entry point (placeholder)
+    │
+    ├── css/
+    │   └── styles.css          # Global stylesheet (placeholder — UI not built yet)
+    │
+    ├── data/
+    │   └── sample-classroom.json  # Fictional fixture data for local dev/testing
+    │
+    └── js/
+        ├── main.js             # Application bootstrap / entry script
+        │
+        ├── config/             # Centralised configuration and vocabulary
+        │   ├── actionTypes.js      # The fixed set of Event types (the action vocabulary)
+        │   ├── scoringConfig.js    # How Event types map to derived scores/weights
+        │   └── appConfig.js        # General app-wide settings (storage keys, locale, etc.)
+        │
+        ├── models/             # Plain data structures describing core concepts
+        │   ├── Student.js          # Student record shape
+        │   ├── Classroom.js        # Classroom / cohort record shape
+        │   └── Event.js            # Event record shape — the core unit of the event log
+        │
+        ├── services/           # Business logic that operates on models
+        │   ├── classroomService.js    # Classroom-level operations (create, update, list)
+        │   ├── studentService.js      # Student-level operations
+        │   └── eventService.js        # Recording and querying Events
+        │
+        ├── storage/             # Persistence layer (swappable backend)
+        │   ├── storageAdapter.js      # Interface/contract all storage adapters follow
+        │   └── localStorageAdapter.js # Browser localStorage implementation
+        │
+        ├── ui/                  # Rendering and DOM-facing code (not built yet)
+        │   ├── components/
+        │   │   └── README.md        # Notes on planned UI components
+        │   └── renderer.js          # Placeholder for DOM rendering logic
+        │
+        └── utils/               # Small, dependency-free helper functions
+            ├── validators.js        # Input validation helpers
+            ├── dateHelpers.js       # Date formatting/parsing helpers
+            └── idGenerator.js       # Unique ID generation helper
+```
+
+### Why this structure?
+
+- **`models/`** — describes *what the data looks like*, with no logic attached.
+- **`services/`** — describes *what the app can do* with that data (business
+  logic), independent of how it's displayed or stored.
+- **`storage/`** — isolates persistence behind an adapter interface, so the
+  storage backend (currently browser `localStorage`) can be swapped later
+  without touching services or UI.
+- **`ui/`** — isolates all DOM manipulation and rendering, so it can be
+  changed or rebuilt without affecting business logic.
+- **`utils/`** — small, reusable, dependency-free helpers used across layers.
+- **`config/`** — centralises the app's vocabulary and tunable settings
+  (Event types, scoring weights, general app config) so they aren't
+  hardcoded or duplicated across services, models, and the future UI.
+- **`data/`** — holds fictional fixture/sample data for local development,
+  kept separate from anything a Fellow actually enters.
+- **`assets/`** — static, non-code assets (icons, images) used by the UI,
+  kept separate from application logic.
+
+This separation keeps each layer independently testable and lets us build
+features incrementally without reworking the foundation.
+
+### Event-Driven Architecture
+
+Classroom Tracker is built around a single core concept: the **Event**.
+Rather than storing and mutating a student's "current state" directly
+(e.g. overwriting a progress field), the app records discrete, timestamped
+Events — an academic update, a behavioural note, an attendance mark — and
+derives current state, history, and trends from that event log.
+
+- **`models/Event.js`** defines the shape of a single Event.
+- **`config/actionTypes.js`** defines the fixed vocabulary of Event types
+  the app understands (e.g. `academic`, `behavioural`, `attendance`).
+- **`config/scoringConfig.js`** defines how each Event type contributes to
+  any derived scores or standings.
+- **`services/eventService.js`** contains the logic for recording and
+  querying Events.
+
+This approach keeps a full, auditable history of everything logged for a
+student or classroom, and makes it straightforward to add new Event types
+or scoring rules later without reshaping existing data.
+
+---
+
+## Getting Started
+
+This project has no build step and no external dependencies. All you need is
+a modern web browser and a local static file server (to avoid `file://`
+CORS restrictions).
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd classroom-tracker
+```
+
+### 2. Serve the project locally
+
+Any static file server works. For example, using Python:
+
+```bash
+cd src
+python3 -m http.server 8000
+```
+
+Or using Node's `http-server` (if installed globally):
+
+```bash
+npx http-server src -p 8000
+```
+
+Then open `http://localhost:8000` in your browser.
+
+### 3. Formatting
+
+This project uses [Prettier](https://prettier.io) for consistent code
+formatting. Configuration lives in `.prettierrc`. If you have Prettier
+installed:
+
+```bash
+npx prettier --write .
+```
+
+---
+
+## Contributing
+
+Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull
+request.
+
+## Project Status
+
+This milestone covers project scaffolding only:
+
+- [x] Folder structure and modular architecture
+- [x] Placeholder files with documented responsibilities
+- [x] Project documentation (problem statement, contributing guide)
+- [x] Editor and formatting configuration
+- [ ] Feature implementation (upcoming milestones)
+- [ ] UI build-out (upcoming milestones)
+
+No features have been implemented and no UI has been built as part of this
+milestone.
