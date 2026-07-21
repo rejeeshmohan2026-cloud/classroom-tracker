@@ -1,14 +1,13 @@
 /**
  * ui/views/StudentProfileView.js
  *
- * The individual Student Profile: name, group, Learning Bucket (editable),
- * current session score, total positive/negative points, Behaviour
- * Badges (award/revoke, plus growing the classroom's badge catalog),
- * Teacher Notes, a "Log Participation" control, and the Participation
- * History timeline. Everything here is computed live from the same
- * underlying data (score, history, badges, notes) — there's no separate
- * "report" data structure to keep in sync, so this page doubles as its
- * own report per the brief.
+ * The Student Profile: a tabbed dashboard (Overview / Achievements /
+ * Learning / Activity / Notes) rather than one long form. The header is
+ * tinted with the student's Learning Bucket colour (soft pastel, not a
+ * bright solid) and summarizes every key stat at a glance; each tab adds
+ * detail and, where relevant, an action button that opens a modal
+ * (Award Badge, Add Note, Log Participation) rather than showing a
+ * permanent input field.
  *
  * Like ui/views/SettingsView.js and ui/views/SetupWizardView.js, this
  * file calls straight into services and mutates the classroom/student
@@ -20,12 +19,27 @@ import * as workspaceService from '../../services/workspaceService.js';
 import * as studentService from '../../services/studentService.js';
 import * as bucketService from '../../services/bucketService.js';
 import * as badgeService from '../../services/badgeService.js';
-import * as participationService from '../../services/participationService.js';
-import { BUCKET_KEYS, BUCKET_LABELS } from '../../config/bucketConfig.js';
+import * as noteService from '../../services/noteService.js';
+import * as timelineService from '../../services/timelineService.js';
+import * as learningActivityService from '../../services/learningActivityService.js';
+import { BUCKET_KEYS, BUCKET_LABELS, getBucketLabel, getBucketRowStyle } from '../../config/bucketConfig.js';
+import { getGroupColorHex } from '../../config/groupColorConfig.js';
 import { formatDate } from '../../utils/dateHelpers.js';
 import { createEmptyStateElement } from '../components/EmptyState.js';
+import { openAwardBadgeModal } from '../components/AwardBadgeModal.js';
+import { openAddNoteModal } from '../components/AddNoteModal.js';
+import { openLogParticipationModal } from '../components/LogParticipationModal.js';
 
-export function renderStudentProfileView(container, { classroom, studentId, onBack }) {
+const TABS = ['overview', 'achievements', 'learning', 'activity', 'notes'];
+const TAB_LABELS = {
+  overview: 'Overview',
+  achievements: 'Achievements',
+  learning: 'Learning',
+  activity: 'Activity',
+  notes: 'Notes',
+};
+
+export function renderStudentProfileView(container, { classroom, studentId, tab, onBack, onNavigateTab }) {
   container.innerHTML = '';
 
   const found = studentService.findStudentInClassroom(classroom, studentId);
@@ -35,30 +49,44 @@ export function renderStudentProfileView(container, { classroom, studentId, onBa
   }
 
   const { student, team } = found;
-  const rerender = () => renderStudentProfileView(container, { classroom, studentId, onBack });
+  const activeTab = TABS.includes(tab) ? tab : 'overview';
+  const rerender = () => renderStudentProfileView(container, { classroom, studentId, tab: activeTab, onBack, onNavigateTab });
 
   const wrapper = document.createElement('div');
   wrapper.className = 'profile-view';
 
-  wrapper.appendChild(renderProfileHeader(student, team, onBack));
-  wrapper.appendChild(renderOverviewSection(student, rerender));
-  wrapper.appendChild(renderBadgesSection(classroom, student, rerender));
-  wrapper.appendChild(renderNotesSection(student, rerender));
-  wrapper.appendChild(renderLogParticipationSection(student, rerender));
-  wrapper.appendChild(renderHistorySection(student));
+  wrapper.appendChild(renderProfileHeader(classroom, student, team, onBack));
+  wrapper.appendChild(renderTabNav(activeTab, onNavigateTab));
 
+  const content = document.createElement('div');
+  content.className = 'profile-tab-content';
+
+  const tabRenderers = {
+    overview: renderOverviewTab,
+    achievements: renderAchievementsTab,
+    learning: renderLearningTab,
+    activity: renderActivityTab,
+    notes: renderNotesTab,
+  };
+  tabRenderers[activeTab](content, classroom, student, team, rerender);
+
+  wrapper.appendChild(content);
   container.appendChild(wrapper);
 }
 
-function renderProfileHeader(student, team, onBack) {
+function renderProfileHeader(classroom, student, team, onBack) {
+  const style = getBucketRowStyle(student.bucket);
+
   const header = document.createElement('header');
   header.className = 'profile-header';
+  header.style.backgroundColor = style.background;
 
   const backButton = document.createElement('button');
   backButton.type = 'button';
   backButton.className = 'btn btn--text';
   backButton.textContent = '\u2190 Back to Tracker';
   backButton.addEventListener('click', onBack);
+  header.appendChild(backButton);
 
   const titleBlock = document.createElement('div');
   titleBlock.className = 'profile-header__title-block';
@@ -72,20 +100,74 @@ function renderProfileHeader(student, team, onBack) {
   groupLine.textContent = team ? team.name : 'Ungrouped';
 
   titleBlock.append(name, groupLine);
-  header.append(backButton, titleBlock);
+  header.appendChild(titleBlock);
+
+  const summary = learningActivityService.getSubmissionSummary(classroom, student);
+  const submissionText = `${summary.Submitted} Submitted \u00b7 ${summary['Submitted Late']} Late \u00b7 ${summary.Missing} Missing`;
+
+  const stats = document.createElement('div');
+  stats.className = 'profile-header__stats';
+
+  [
+    ['Bucket', getBucketLabel(student.bucket)],
+    ['Session Score', student.score],
+    ['Positive', timelineService.getTotalPositivePoints(student)],
+    ['Negative', timelineService.getTotalNegativePoints(student)],
+    ['Badges', (student.badges || []).length],
+    ['Notes', (student.notes || []).length],
+    ['Learning Activities', submissionText],
+  ].forEach(([label, value]) => {
+    stats.appendChild(createHeaderChip(label, value));
+  });
+
+  header.appendChild(stats);
   return header;
 }
 
-function renderOverviewSection(student, rerender) {
-  const section = document.createElement('div');
-  section.className = 'profile-overview';
+function createHeaderChip(label, value) {
+  const chip = document.createElement('div');
+  chip.className = 'profile-header__chip';
 
-  const bucketCard = document.createElement('div');
-  bucketCard.className = 'profile-stat-card';
+  const labelEl = document.createElement('span');
+  labelEl.className = 'profile-header__chip-label';
+  labelEl.textContent = label;
 
-  const bucketLabel = document.createElement('span');
-  bucketLabel.className = 'profile-stat-card__label';
-  bucketLabel.textContent = 'Learning Bucket';
+  const valueEl = document.createElement('span');
+  valueEl.className = 'profile-header__chip-value';
+  valueEl.textContent = String(value);
+
+  chip.append(labelEl, valueEl);
+  return chip;
+}
+
+function renderTabNav(activeTab, onNavigateTab) {
+  const nav = document.createElement('nav');
+  nav.className = 'profile-tabs';
+  nav.setAttribute('aria-label', 'Student profile sections');
+
+  TABS.forEach((key) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'profile-tabs__tab' + (key === activeTab ? ' profile-tabs__tab--active' : '');
+    button.textContent = TAB_LABELS[key];
+    button.addEventListener('click', () => onNavigateTab(key));
+    nav.appendChild(button);
+  });
+
+  return nav;
+}
+
+// ---------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------
+
+function renderOverviewTab(content, classroom, student, team, rerender) {
+  const bucketSection = document.createElement('div');
+  bucketSection.className = 'profile-section';
+  const bucketHeading = document.createElement('h2');
+  bucketHeading.className = 'profile-section__heading';
+  bucketHeading.textContent = 'Learning Bucket';
+  bucketSection.appendChild(bucketHeading);
 
   const bucketSelect = document.createElement('select');
   bucketSelect.className = 'profile-stat-card__select';
@@ -110,16 +192,45 @@ function renderOverviewSection(student, rerender) {
     rerender();
   });
 
-  bucketCard.append(bucketLabel, bucketSelect);
+  bucketSection.appendChild(bucketSelect);
+  content.appendChild(bucketSection);
 
-  section.append(
-    bucketCard,
-    createStatCard('Current Session Score', student.score),
-    createStatCard('Total Positive Points', participationService.getTotalPositivePoints(student)),
-    createStatCard('Total Negative Points', participationService.getTotalNegativePoints(student))
-  );
+  const statsSection = document.createElement('div');
+  statsSection.className = 'profile-section';
+  const statsHeading = document.createElement('h2');
+  statsHeading.className = 'profile-section__heading';
+  statsHeading.textContent = 'Statistics';
+  statsSection.appendChild(statsHeading);
 
-  return section;
+  const statsGrid = document.createElement('div');
+  statsGrid.className = 'profile-overview';
+  statsGrid.appendChild(createStatCard('Current Session Score', student.score));
+  statsGrid.appendChild(createStatCard('Total Positive Points', timelineService.getTotalPositivePoints(student)));
+  statsGrid.appendChild(createStatCard('Total Negative Points', timelineService.getTotalNegativePoints(student)));
+  statsSection.appendChild(statsGrid);
+  content.appendChild(statsSection);
+
+  const groupSection = document.createElement('div');
+  groupSection.className = 'profile-section';
+  const groupHeading = document.createElement('h2');
+  groupHeading.className = 'profile-section__heading';
+  groupHeading.textContent = 'Group';
+  groupSection.appendChild(groupHeading);
+
+  const groupCard = document.createElement('div');
+  groupCard.className = 'profile-group-card';
+  if (team) {
+    const swatch = document.createElement('span');
+    swatch.className = 'profile-group-card__swatch';
+    swatch.style.backgroundColor = team.color ? getGroupColorHex(team.color) : '#94a3b8';
+    const name = document.createElement('span');
+    name.textContent = team.name;
+    groupCard.append(swatch, name);
+  } else {
+    groupCard.textContent = 'Ungrouped';
+  }
+  groupSection.appendChild(groupCard);
+  content.appendChild(groupSection);
 }
 
 function createStatCard(label, value) {
@@ -138,7 +249,11 @@ function createStatCard(label, value) {
   return card;
 }
 
-function renderBadgesSection(classroom, student, rerender) {
+// ---------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------
+
+function renderAchievementsTab(content, classroom, student, team, rerender) {
   const section = document.createElement('div');
   section.className = 'profile-section';
 
@@ -147,26 +262,32 @@ function renderBadgesSection(classroom, student, rerender) {
   heading.textContent = 'Behaviour Badges';
   section.appendChild(heading);
 
-  const badgeList = document.createElement('div');
-  badgeList.className = 'badge-list';
-
   const awardedBadges = student.badges || [];
+
   if (awardedBadges.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'profile-section__meta';
-    empty.textContent = 'No badges awarded yet.';
-    badgeList.appendChild(empty);
+    section.appendChild(
+      createEmptyStateElement({
+        message: 'No badges earned yet. Award a badge to celebrate positive behaviour.',
+      })
+    );
   } else {
+    const grid = document.createElement('div');
+    grid.className = 'achievement-grid';
     awardedBadges.forEach((badgeName) => {
-      const chip = document.createElement('span');
-      chip.className = 'badge-chip';
+      const card = document.createElement('div');
+      card.className = 'achievement-card';
+
+      const icon = document.createElement('span');
+      icon.className = 'achievement-card__icon';
+      icon.textContent = '\u2605';
 
       const label = document.createElement('span');
+      label.className = 'achievement-card__label';
       label.textContent = badgeName;
 
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
-      removeButton.className = 'badge-chip__remove';
+      removeButton.className = 'achievement-card__remove';
       removeButton.textContent = '\u00d7';
       removeButton.setAttribute('aria-label', `Remove ${badgeName} badge`);
       removeButton.addEventListener('click', () => {
@@ -175,71 +296,202 @@ function renderBadgesSection(classroom, student, rerender) {
         rerender();
       });
 
-      chip.append(label, removeButton);
-      badgeList.appendChild(chip);
+      card.append(icon, label, removeButton);
+      grid.appendChild(card);
     });
+    section.appendChild(grid);
   }
-  section.appendChild(badgeList);
-
-  const catalog = badgeService.listCatalog(classroom);
-  const availableBadges = catalog.filter((badge) => !awardedBadges.includes(badge));
-
-  const awardForm = document.createElement('div');
-  awardForm.className = 'settings-add-form';
-
-  const badgeSelect = document.createElement('select');
-  availableBadges.forEach((badgeName) => {
-    const option = document.createElement('option');
-    option.value = badgeName;
-    option.textContent = badgeName;
-    badgeSelect.appendChild(option);
-  });
 
   const awardButton = document.createElement('button');
   awardButton.type = 'button';
-  awardButton.className = 'btn btn--ghost';
-  awardButton.textContent = 'Award Badge';
-  awardButton.disabled = availableBadges.length === 0;
+  awardButton.className = 'btn btn--primary';
+  awardButton.textContent = '+ Award Badge';
   awardButton.addEventListener('click', () => {
-    if (!badgeSelect.value) return;
-    badgeService.awardBadge(student, badgeSelect.value);
-    workspaceService.save();
-    rerender();
+    const catalog = badgeService.listCatalog(classroom);
+    const availableBadges = catalog.filter((badge) => !awardedBadges.includes(badge));
+
+    openAwardBadgeModal({
+      availableBadges,
+      onAwardExisting: (badgeName) => {
+        badgeService.awardBadge(student, badgeName);
+        workspaceService.save();
+        rerender();
+      },
+      onCreateAndAward: (badgeName) => {
+        badgeService.addBadgeToCatalog(classroom, badgeName);
+        badgeService.awardBadge(student, badgeName);
+        workspaceService.save();
+        rerender();
+      },
+    });
   });
+  section.appendChild(awardButton);
 
-  awardForm.append(badgeSelect, awardButton);
-  section.appendChild(awardForm);
-
-  const newBadgeForm = document.createElement('div');
-  newBadgeForm.className = 'settings-add-form';
-
-  const newBadgeInput = document.createElement('input');
-  newBadgeInput.type = 'text';
-  newBadgeInput.placeholder = 'New badge name';
-
-  const addBadgeButton = document.createElement('button');
-  addBadgeButton.type = 'button';
-  addBadgeButton.className = 'btn btn--text';
-  addBadgeButton.textContent = 'Add to badge catalog';
-  addBadgeButton.addEventListener('click', () => {
-    const name = newBadgeInput.value.trim();
-    if (!name) return;
-    const added = badgeService.addBadgeToCatalog(classroom, name);
-    if (!added) {
-      window.alert('That badge already exists in this classroom\u2019s catalog.');
-      return;
-    }
-    workspaceService.save();
-    rerender();
-  });
-
-  newBadgeForm.append(newBadgeInput, addBadgeButton);
-  section.appendChild(newBadgeForm);
-
-  return section;
+  content.appendChild(section);
 }
 
-function renderNotesSection(student, rerender) {
+// ---------------------------------------------------------------------
+// Learning
+// ---------------------------------------------------------------------
+
+function renderLearningTab(content, classroom, student) {
+  const section = document.createElement('div');
+  section.className = 'profile-section';
+
+  const heading = document.createElement('h2');
+  heading.className = 'profile-section__heading';
+  heading.textContent = 'Learning Activities';
+  section.appendChild(heading);
+
+  const activities = learningActivityService.listActivities(classroom);
+
+  if (activities.length === 0) {
+    section.appendChild(
+      createEmptyStateElement({
+        message: 'No learning activities yet. Create an assignment to begin tracking submissions.',
+      })
+    );
+    content.appendChild(section);
+    return;
+  }
+
+  const summary = learningActivityService.getSubmissionSummary(classroom, student);
+  const summaryLine = document.createElement('p');
+  summaryLine.className = 'profile-section__meta';
+  summaryLine.textContent = `${summary.Submitted} Submitted \u00b7 ${summary['Submitted Late']} Late \u00b7 ${summary.Missing} Missing \u00b7 ${summary.Resubmitted} Resubmitted`;
+  section.appendChild(summaryLine);
+
+  const note = document.createElement('p');
+  note.className = 'profile-section__meta';
+  note.textContent = 'Statuses are set from Learning Activities (see the classroom\u2019s Activities screen), not from here.';
+  section.appendChild(note);
+
+  const list = document.createElement('div');
+  list.className = 'activity-list';
+
+  activities.forEach((activity) => {
+    const status = learningActivityService.getSubmissionStatus(student, activity.id);
+    const submission = student.submissions?.[activity.id];
+
+    const card = document.createElement('div');
+    card.className = 'activity-card';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'activity-card__title-row';
+    const title = document.createElement('span');
+    title.className = 'activity-card__title';
+    title.textContent = activity.title;
+    const type = document.createElement('span');
+    type.className = 'activity-card__type';
+    type.textContent = activity.type;
+    titleRow.append(title, type);
+    card.appendChild(titleRow);
+
+    if (activity.dueDate) {
+      const due = document.createElement('p');
+      due.className = 'profile-section__meta';
+      due.textContent = `Due ${activity.dueDate}`;
+      card.appendChild(due);
+    }
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'status-badge status-badge--' + status.toLowerCase().replace(/\s+/g, '-');
+    statusBadge.textContent = status;
+    card.appendChild(statusBadge);
+
+    if (submission?.score !== null && submission?.score !== undefined && submission?.score !== '') {
+      const score = document.createElement('p');
+      score.className = 'profile-section__meta';
+      score.textContent = `Score: ${submission.score}`;
+      card.appendChild(score);
+    }
+
+    if (submission?.feedback) {
+      const feedback = document.createElement('p');
+      feedback.className = 'profile-section__meta';
+      feedback.textContent = `Feedback: ${submission.feedback}`;
+      card.appendChild(feedback);
+    }
+
+    list.appendChild(card);
+  });
+
+  section.appendChild(list);
+  content.appendChild(section);
+}
+
+// ---------------------------------------------------------------------
+// Activity (Participation Timeline)
+// ---------------------------------------------------------------------
+
+function renderActivityTab(content, classroom, student, team, rerender) {
+  const section = document.createElement('div');
+  section.className = 'profile-section';
+
+  const heading = document.createElement('h2');
+  heading.className = 'profile-section__heading';
+  heading.textContent = 'Participation';
+  section.appendChild(heading);
+
+  const entries = timelineService.listTimeline(student);
+
+  if (entries.length === 0) {
+    section.appendChild(createEmptyStateElement({ message: 'No activity recorded.' }));
+  } else {
+    const timeline = document.createElement('ul');
+    timeline.className = 'timeline';
+
+    entries.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'timeline__item';
+
+      const label = document.createElement('span');
+      label.className = 'timeline__label';
+
+      if (entry.kind === 'badge') {
+        label.textContent = `${entry.label} Badge Awarded`;
+      } else if (entry.kind === 'points') {
+        const sign = entry.delta > 0 ? '+' : '';
+        label.textContent = `${sign}${entry.delta} ${entry.label}`;
+        label.classList.add(entry.delta > 0 ? 'timeline__label--positive' : 'timeline__label--negative');
+      } else {
+        label.textContent = entry.label;
+      }
+
+      const date = document.createElement('span');
+      date.className = 'timeline__date';
+      date.textContent = formatDate(entry.recordedAt);
+
+      item.append(label, date);
+      timeline.appendChild(item);
+    });
+
+    section.appendChild(timeline);
+  }
+
+  const logButton = document.createElement('button');
+  logButton.type = 'button';
+  logButton.className = 'btn btn--primary';
+  logButton.textContent = '+ Log Participation';
+  logButton.addEventListener('click', () => {
+    openLogParticipationModal({
+      onSave: ({ delta, reason }) => {
+        timelineService.logPoints(student, delta, reason);
+        workspaceService.save();
+        rerender();
+      },
+    });
+  });
+  section.appendChild(logButton);
+
+  content.appendChild(section);
+}
+
+// ---------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------
+
+function renderNotesTab(content, classroom, student, team, rerender) {
   const section = document.createElement('div');
   section.className = 'profile-section';
 
@@ -248,126 +500,57 @@ function renderNotesSection(student, rerender) {
   heading.textContent = 'Teacher Notes';
   section.appendChild(heading);
 
-  const textarea = document.createElement('textarea');
-  textarea.className = 'profile-notes__textarea';
-  textarea.rows = 4;
-  textarea.value = student.notes || '';
-  section.appendChild(textarea);
+  const notes = noteService.listNotes(student);
 
-  const saveButton = document.createElement('button');
-  saveButton.type = 'button';
-  saveButton.className = 'btn btn--primary';
-  saveButton.textContent = 'Save Notes';
-  saveButton.addEventListener('click', () => {
-    studentService.updateNotes(student, textarea.value);
-    workspaceService.save();
-    rerender();
-  });
-  section.appendChild(saveButton);
+  if (notes.length === 0) {
+    section.appendChild(
+      createEmptyStateElement({
+        message: 'No notes yet. Add observations to support future conversations.',
+      })
+    );
+  } else {
+    const list = document.createElement('div');
+    list.className = 'note-list';
 
-  return section;
-}
+    notes.forEach((note) => {
+      const card = document.createElement('div');
+      card.className = 'note-card';
 
-function renderLogParticipationSection(student, rerender) {
-  const section = document.createElement('div');
-  section.className = 'profile-section';
+      const metaRow = document.createElement('div');
+      metaRow.className = 'note-card__meta';
+      const teacher = document.createElement('span');
+      teacher.className = 'note-card__teacher';
+      teacher.textContent = note.teacherName || 'Teacher';
+      const date = document.createElement('span');
+      date.className = 'note-card__date';
+      date.textContent = formatDate(note.createdAt);
+      metaRow.append(teacher, date);
 
-  const heading = document.createElement('h2');
-  heading.className = 'profile-section__heading';
-  heading.textContent = 'Log Participation';
-  section.appendChild(heading);
+      const contentEl = document.createElement('p');
+      contentEl.className = 'note-card__content';
+      contentEl.textContent = note.content;
 
-  const intro = document.createElement('p');
-  intro.className = 'profile-section__meta';
-  intro.textContent = 'Record a point change with a reason \u2014 it\u2019ll appear below in Participation History.';
-  section.appendChild(intro);
+      card.append(metaRow, contentEl);
+      list.appendChild(card);
+    });
 
-  const form = document.createElement('div');
-  form.className = 'profile-log-form';
-
-  const pointsInput = document.createElement('input');
-  pointsInput.type = 'number';
-  pointsInput.value = '1';
-  pointsInput.className = 'profile-log-form__points';
-  pointsInput.setAttribute('aria-label', 'Point value');
-
-  const reasonInput = document.createElement('input');
-  reasonInput.type = 'text';
-  reasonInput.placeholder = 'Reason, e.g. "Correct answer"';
-  reasonInput.className = 'profile-log-form__reason';
+    section.appendChild(list);
+  }
 
   const addButton = document.createElement('button');
   addButton.type = 'button';
   addButton.className = 'btn btn--primary';
-  addButton.textContent = 'Log Entry';
+  addButton.textContent = '+ Add Note';
   addButton.addEventListener('click', () => {
-    const delta = Number(pointsInput.value);
-    const reason = reasonInput.value.trim();
-
-    if (!Number.isFinite(delta) || delta === 0) {
-      window.alert('Enter a non-zero point value.');
-      return;
-    }
-    if (!reason) {
-      window.alert('Enter a reason for this entry.');
-      return;
-    }
-
-    participationService.logPoints(student, delta, reason);
-    workspaceService.save();
-    rerender();
+    openAddNoteModal({
+      onSave: ({ teacherName, content }) => {
+        noteService.addNote(student, { teacherName, content });
+        workspaceService.save();
+        rerender();
+      },
+    });
   });
+  section.appendChild(addButton);
 
-  form.append(pointsInput, reasonInput, addButton);
-  section.appendChild(form);
-
-  return section;
-}
-
-function renderHistorySection(student) {
-  const section = document.createElement('div');
-  section.className = 'profile-section';
-
-  const heading = document.createElement('h2');
-  heading.className = 'profile-section__heading';
-  heading.textContent = 'Participation History';
-  section.appendChild(heading);
-
-  const entries = participationService.listHistory(student);
-  if (entries.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'profile-section__meta';
-    empty.textContent = 'No participation logged yet.';
-    section.appendChild(empty);
-    return section;
-  }
-
-  const timeline = document.createElement('ul');
-  timeline.className = 'timeline';
-
-  entries.forEach((entry) => {
-    const item = document.createElement('li');
-    item.className = 'timeline__item';
-
-    const label = document.createElement('span');
-    label.className = 'timeline__label';
-
-    if (entry.kind === 'badge') {
-      label.textContent = `Badge Awarded: ${entry.label}`;
-    } else {
-      const sign = entry.delta > 0 ? '+' : '';
-      label.textContent = `${sign}${entry.delta} ${entry.label}`;
-      label.classList.add(entry.delta > 0 ? 'timeline__label--positive' : 'timeline__label--negative');
-    }
-
-    const date = document.createElement('span');
-    date.className = 'timeline__date';
-    date.textContent = formatDate(entry.recordedAt);
-
-    item.append(label, date);
-    timeline.appendChild(item);
-  });
-
-  section.appendChild(timeline);
-  return section;
+  content.appendChild(section);
 }

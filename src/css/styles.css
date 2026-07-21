@@ -406,10 +406,8 @@ select:focus-visible,
 
 .student-row {
   border-radius: var(--radius-control);
+  border-left: 4px solid transparent;
   overflow: hidden;
-}
-.student-row:nth-child(odd) {
-  background-color: var(--color-bg);
 }
 
 .student-row__button {
@@ -429,7 +427,7 @@ select:focus-visible,
   transition: background-color 0.15s ease;
 }
 .student-row__button:hover {
-  background-color: rgba(14, 192, 226, 0.1);
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .student-row__name {
@@ -869,48 +867,12 @@ button.wizard-checklist__row:hover {
   margin-bottom: 1.5rem;
 }
 
-/* Bucket indicator on student rows */
-
-.student-row__name-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.student-row__bucket-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 /* Student Profile */
 
 .profile-view {
   max-width: 720px;
   margin: 0 auto;
   padding-bottom: 2rem;
-}
-
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  background-color: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.profile-header__name {
-  font-size: 1.3rem;
-  font-weight: 800;
-  margin: 0;
-}
-
-.profile-header__group {
-  margin: 0.15rem 0 0;
-  font-size: 0.85rem;
-  color: var(--color-muted);
 }
 
 .profile-overview {
@@ -964,46 +926,6 @@ button.wizard-checklist__row:hover {
   color: var(--color-muted);
   font-size: 0.9rem;
   margin: 0 0 0.75rem;
-}
-
-.badge-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.badge-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background-color: rgba(14, 192, 226, 0.12);
-  color: var(--color-cyan-dark);
-  font-weight: 700;
-  font-size: 0.85rem;
-  padding: 0.35rem 0.5rem 0.35rem 0.75rem;
-  border-radius: 999px;
-}
-
-.badge-chip__remove {
-  background: none;
-  border: none;
-  color: inherit;
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 0.15rem;
-}
-
-.profile-notes__textarea {
-  display: block;
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  font-family: inherit;
-  resize: vertical;
-  margin-bottom: 0.75rem;
 }
 
 .profile-log-form {
@@ -1063,6 +985,351 @@ button.wizard-checklist__row:hover {
   color: var(--color-muted);
   font-size: 0.82rem;
   white-space: nowrap;
+}
+
+/* Student Profile — header & tabs */
+
+.profile-header {
+  padding: 1.25rem 1.5rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-header__title-block {
+  margin: 0.75rem 0 1rem;
+}
+
+.profile-header__name {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.profile-header__group {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.profile-header__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.profile-header__chip {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 100px;
+}
+
+.profile-header__chip-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+}
+
+.profile-header__chip-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.profile-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-tabs__tab {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.6rem 0.9rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.profile-tabs__tab--active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-cyan);
+}
+
+.profile-tab-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.profile-group-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+.profile-group-card__swatch {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Achievements */
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.achievement-card {
+  position: relative;
+  background: linear-gradient(160deg, #fffbea, #fff3c4);
+  border: 1px solid #f2d477;
+  border-radius: var(--radius-card);
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.achievement-card__icon {
+  font-size: 1.5rem;
+  color: #b7791f;
+}
+
+.achievement-card__label {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.achievement-card__remove {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: var(--color-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+.achievement-card__remove:hover {
+  color: var(--color-danger);
+}
+
+/* Notes */
+
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.note-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.15rem;
+}
+
+.note-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-bottom: 0.4rem;
+}
+
+.note-card__teacher {
+  font-weight: 700;
+}
+
+.note-card__content {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Learning Activities */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.activity-card,
+.activity-list-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.15rem;
+  text-align: left;
+  font-family: inherit;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.activity-list-card {
+  cursor: pointer;
+  width: 100%;
+}
+.activity-list-card:hover {
+  border-color: var(--color-cyan);
+}
+
+.activity-card__title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.activity-card__title {
+  font-weight: 800;
+}
+
+.activity-card__type {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.status-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background-color: #eef1f4;
+  color: var(--color-muted);
+}
+.status-badge--submitted {
+  background-color: #e4f5e8;
+  color: #1e8a3c;
+}
+.status-badge--submitted-late {
+  background-color: #fff3d6;
+  color: #b7791f;
+}
+.status-badge--missing {
+  background-color: #fbe4e2;
+  color: var(--color-danger);
+}
+.status-badge--resubmitted {
+  background-color: #e2effb;
+  color: var(--color-cyan-dark);
+}
+
+.new-activity-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.new-activity-form input,
+.new-activity-form select {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activities-view {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.activity-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.activity-roster-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.activity-roster-row__name {
+  flex: 1;
+  min-width: 160px;
+  font-weight: 600;
+}
+
+.activity-roster-row__feedback {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activity-roster-row__score {
+  width: 80px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activity-roster-row select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+/* Modal additions: toggle group + divider (Log Participation / Award Badge) */
+
+.modal__toggle-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.modal__toggle {
+  flex: 1;
+  font-family: inherit;
+  font-weight: 700;
+  padding: 0.6rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: none;
+  cursor: pointer;
+  color: var(--color-muted);
+}
+.modal__toggle--active {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan-dark);
+  background-color: rgba(14, 192, 226, 0.08);
+}
+
+.modal__divider {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 1rem 0;
 }
 
 /* Accessibility & responsiveness */

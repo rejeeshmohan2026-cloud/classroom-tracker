@@ -21,10 +21,14 @@
  *   teachers       - Member[] who can award points, undo, reset, import
  *                    rosters, edit students/groups, and invite teachers
  *   teams          - Team[] (see models/Team.js)
+ *   learningActivities - LearningActivity[] (see models/LearningActivity.js),
+ *                    created once per classroom; each student then gets
+ *                    a status against each one (see models/Student.js)
  *   settings       - classroom-level settings: bucket scoring, point
- *                    scoring, and Setup Wizard progress — see
- *                    config/classroomDefaults.js for the defaults, built
- *                    fresh for every classroom (never a shared reference)
+ *                    scoring, badge catalog, and Setup Wizard progress —
+ *                    see config/classroomDefaults.js for the defaults,
+ *                    built fresh for every classroom (never a shared
+ *                    reference)
  */
 
 import { generateId } from '../utils/idGenerator.js';
@@ -42,6 +46,7 @@ export function createClassroom({
   administrators = [],
   teachers = [],
   teams = [],
+  learningActivities = [],
   settings = buildDefaultSettings(),
 } = {}) {
   return {
@@ -55,6 +60,7 @@ export function createClassroom({
     administrators,
     teachers,
     teams,
+    learningActivities,
     settings,
   };
 }

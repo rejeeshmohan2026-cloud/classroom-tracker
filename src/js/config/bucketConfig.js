@@ -1,16 +1,19 @@
 /**
  * config/bucketConfig.js
  *
- * Learning Buckets are an optional, per-student classification (Green /
- * Yellow / Red) a teacher can assign during or after roster import.
- * Scoring per bucket is configurable per classroom (see
- * config/classroomDefaults.js for the defaults and
- * services/bucketService.js for reading/updating it) — never hardcoded.
+ * Learning Buckets are a per-student classification: Green, Yellow, Red,
+ * or Not Assigned. Names are fixed and never relabeled anywhere in the
+ * app. Scoring per bucket is configurable per classroom (see
+ * config/classroomDefaults.js / services/bucketService.js).
  *
- * These three colours are reserved for buckets specifically — see
- * config/groupColorConfig.js, whose default group colours deliberately
- * avoid red/yellow/green so a group's colour is never confused with a
+ * These colours are reserved for buckets specifically — see
+ * config/groupColorConfig.js, whose group colours deliberately avoid
+ * red/yellow/green so a group's colour is never confused with a
  * student's bucket.
+ *
+ * BUCKET_ROW_STYLES gives the Tracker's soft pastel treatment (light
+ * background + a coloured left border) rather than a solid colour dot —
+ * chosen for contrast/accessibility against the student name's text.
  */
 
 export const BUCKET_KEYS = Object.freeze(['green', 'yellow', 'red']);
@@ -21,8 +24,30 @@ export const BUCKET_LABELS = Object.freeze({
   red: 'Red',
 });
 
+export const NOT_ASSIGNED_LABEL = 'Not Assigned';
+
+// Used for small solid accents (e.g. an achievement-style chip) where a
+// stronger colour reads fine against a white background.
 export const BUCKET_DISPLAY_COLORS = Object.freeze({
   green: '#2e7d32',
-  yellow: '#f2b705',
-  red: '#d64545',
+  yellow: '#b7791f',
+  red: '#c62828',
 });
+
+// Soft pastel background + left-border treatment for the Tracker's
+// student rows and the Student Profile header — deliberately not bright
+// solid colours (see the brief).
+export const BUCKET_ROW_STYLES = Object.freeze({
+  green: { background: '#EAF7EC', border: '#2e7d32' },
+  yellow: { background: '#FFF8E1', border: '#b7791f' },
+  red: { background: '#FDECEA', border: '#c62828' },
+  notAssigned: { background: '#F3F4F6', border: '#9AA5B1' },
+});
+
+export function getBucketRowStyle(bucketKey) {
+  return BUCKET_ROW_STYLES[bucketKey] || BUCKET_ROW_STYLES.notAssigned;
+}
+
+export function getBucketLabel(bucketKey) {
+  return bucketKey ? BUCKET_LABELS[bucketKey] : NOT_ASSIGNED_LABEL;
+}

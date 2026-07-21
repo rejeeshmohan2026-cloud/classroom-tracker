@@ -21,11 +21,6 @@ export function renameStudent(team, studentId, newName) {
   return student;
 }
 
-export function updateNotes(student, notes) {
-  student.notes = notes;
-  return student;
-}
-
 export function removeStudent(team, studentId) {
   const before = team.students.length;
   team.students = team.students.filter((student) => student.id !== studentId);

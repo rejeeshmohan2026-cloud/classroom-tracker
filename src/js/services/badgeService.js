@@ -3,13 +3,13 @@
  *
  * Manages a classroom's reusable badge catalog and the badges awarded to
  * individual students. Awarding a badge also logs a Participation
- * History entry (see services/participationService.js), matching the
+ * History entry (see services/timelineService.js), matching the
  * "Badge Awarded" timeline example in the brief. Revoking a badge only
  * removes the student's current badge status — the history entry stays,
  * since Participation History is an append-only record of what happened.
  */
 
-import { logEntry } from './participationService.js';
+import { logEntry } from './timelineService.js';
 
 export function listCatalog(classroom) {
   return classroom.settings.badgeCatalog || [];
