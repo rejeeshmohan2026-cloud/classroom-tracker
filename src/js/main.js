@@ -9,7 +9,8 @@
  */
 
 import * as workspaceService from './services/workspaceService.js';
-import { parseClassroomCsv, ClassroomImportError } from './services/classroomImportService.js';
+import * as classroomImportService from './services/classroomImportService.js';
+import { ClassroomImportError } from './services/classroomImportService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
@@ -17,35 +18,56 @@ import { renderHomeView } from './ui/views/HomeView.js';
 import { renderTrackerView } from './ui/views/TrackerView.js';
 import { renderSettingsView } from './ui/views/SettingsView.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
+import { openImportPreviewModal } from './ui/components/ImportPreviewModal.js';
 
 let appContainer = null;
 
 function handleNewClassroom() {
   openNewClassroomModal({
-    onImport: async (details, file, close) => {
-      let teamsWithStudents;
+    onImport: async (details, file, closeNewClassroomModal) => {
+      let analysis;
       try {
         const csvText = await file.text();
-        teamsWithStudents = parseClassroomCsv(csvText);
+        analysis = classroomImportService.analyzeCsv(csvText);
       } catch (error) {
-        const message =
-          error instanceof ClassroomImportError
-            ? error.message
-            : 'Something went wrong reading that file. Please check the CSV and try again.';
-        window.alert(message);
+        window.alert('Something went wrong reading that file. Please check the CSV and try again.');
         return;
       }
-      try {
-        const classroom = workspaceService.importClassroom(details, teamsWithStudents);
-        close();
-        router.navigate(`/classroom/${classroom.id}`);
-      } catch (error) {
-        const message =
-          error instanceof ClassroomValidationError
-            ? error.message
-            : 'Something went wrong creating that classroom.';
-        window.alert(message);
-      }
+
+      openImportPreviewModal({
+        formats: analysis.formats,
+        initialFormatId: analysis.detected.id,
+        getPreview: (formatId) => {
+          try {
+            const teams = classroomImportService.parseWithFormat(formatId, analysis.rows);
+            return { teams };
+          } catch (error) {
+            const message =
+              error instanceof ClassroomImportError
+                ? error.message
+                : 'Could not parse this file with the selected format.';
+            return { teams: [], error: message };
+          }
+        },
+        onConfirm: (formatId) => {
+          try {
+            const teams = classroomImportService.parseWithFormat(formatId, analysis.rows);
+            const classroom = workspaceService.importClassroom(details, teams);
+            closeNewClassroomModal();
+            router.navigate(`/classroom/${classroom.id}`);
+          } catch (error) {
+            const message =
+              error instanceof ClassroomImportError || error instanceof ClassroomValidationError
+                ? error.message
+                : 'Something went wrong creating that classroom.';
+            window.alert(message);
+          }
+        },
+        onCancel: () => {
+          // Leave the New Classroom modal open so the user can pick a
+          // different file or switch to Create Manually.
+        },
+      });
     },
     onCreateManually: (details, close) => {
       try {

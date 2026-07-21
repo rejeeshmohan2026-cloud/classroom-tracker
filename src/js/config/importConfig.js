@@ -1,16 +1,17 @@
 /**
  * config/importConfig.js
  *
- * Configuration for parsing a teacher's classroom spreadsheet (CSV) into
- * a roster of teams and students. Kept separate from appConfig.js since
- * these rules are specific to the import feature (Sprint 1A) and may need
- * to change independently as real spreadsheet formats are tested.
+ * Configuration for the "Teamed" import format (see
+ * services/importFormats/teamedFormat.js) — one of several supported
+ * roster layouts, see services/importFormats/formatRegistry.js for the
+ * full list.
  */
 
-// Matches a header cell like "Group A", "Group B", "Group C", or "Group D"
-// (case-insensitive). This is the row the importer treats as the
-// group-name row; everything above it, column by column, is a student.
-export const GROUP_LABEL_PATTERN = /^group [a-d]$/i;
+// Matches a header cell like "Group A", "Group B", or "Group Falcons"
+// (case-insensitive, any label after "Group "). This is the row the
+// Teamed format treats as the group-name row; everything above it, column
+// by column, is a student.
+export const GROUP_LABEL_PATTERN = /^group\s+\S.*/i;
 
 // Row labels to ignore anywhere above the group-name row — these are
 // spreadsheet sections (running totals, weekly summaries, a legend, etc.),
