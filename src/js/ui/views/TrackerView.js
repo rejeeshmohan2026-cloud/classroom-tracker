@@ -1,21 +1,41 @@
 /**
  * ui/views/TrackerView.js
  *
- * The per-classroom tracker screen: header (Back / classroom name / Undo
- * / Reset Session / Settings) and the team-cards grid below it. Undo and
- * Reset Session are visible but disabled this milestone — awarding points
- * is a future milestone, so there's nothing to undo or reset yet. The
- * architecture (services/eventService.js) is ready; only the wiring is
- * deferred.
+ * Class Mode: the tracker is now the primary working screen during a
+ * lesson. Tap a student to award a star, swipe left to deduct a point,
+ * press and hold for Quick Actions (Award Badge / Add Note / Change
+ * Bucket / Open Full Profile) — see ClassModeStudentRow.js and
+ * QuickActionsSheet.js. Every action saves immediately, shows a subtle
+ * toast, and re-renders in place (no navigation, no modal for the
+ * routine actions). Undo reverses the single most recent action of any
+ * kind (see services/classModeService.js); Reset Session zeroes every
+ * student's score for a fresh lesson without touching their permanent
+ * profile data (badges, notes, bucket, lifetime history).
  */
 
 import { createTeamCardElement } from '../components/TeamCard.js';
 import { createEmptyStateElement } from '../components/EmptyState.js';
+import { openQuickActionsSheet } from '../components/QuickActionsSheet.js';
+import { openAwardBadgeModal } from '../components/AwardBadgeModal.js';
+import { openAddNoteModal } from '../components/AddNoteModal.js';
+import { showToast } from '../components/Toast.js';
+import * as workspaceService from '../../services/workspaceService.js';
+import * as studentService from '../../services/studentService.js';
+import * as badgeService from '../../services/badgeService.js';
+import * as noteService from '../../services/noteService.js';
+import * as classModeService from '../../services/classModeService.js';
 import { getTeamScore } from '../../services/teamService.js';
 import { getDisplayName, getDisplaySubtitle } from '../../services/classroomService.js';
 
-export function renderTrackerView(container, { classroom, onBack, onSettings, onActivities, onSelectStudent }) {
+export function renderTrackerView(container, props) {
+  const { classroom, onBack, onSettings, onActivities, onSelectStudent } = props;
+  const highlight = props._highlight || {};
+
   container.innerHTML = '';
+
+  const rerender = (nextHighlight) => {
+    renderTrackerView(container, { ...props, _highlight: nextHighlight || {} });
+  };
 
   const wrapper = document.createElement('div');
   wrapper.className = 'tracker-view';
@@ -48,19 +68,38 @@ export function renderTrackerView(container, { classroom, onBack, onSettings, on
   const actions = document.createElement('div');
   actions.className = 'tracker-header__actions';
 
+  const hasStudents = classroom.teams.some((team) => team.students.length > 0);
+
   const undoButton = document.createElement('button');
   undoButton.type = 'button';
   undoButton.className = 'btn btn--ghost';
   undoButton.textContent = 'Undo';
-  undoButton.disabled = true;
-  undoButton.title = 'Scoring is not implemented yet';
+  undoButton.disabled = !classModeService.canUndo(classroom);
+  undoButton.addEventListener('click', () => {
+    const undone = classModeService.undo(classroom);
+    if (undone) {
+      workspaceService.save();
+      showToast('Last action undone');
+      rerender();
+    }
+  });
 
   const resetButton = document.createElement('button');
   resetButton.type = 'button';
   resetButton.className = 'btn btn--danger';
   resetButton.textContent = 'Reset Session';
-  resetButton.disabled = true;
-  resetButton.title = 'Scoring is not implemented yet';
+  resetButton.disabled = !hasStudents;
+  resetButton.addEventListener('click', () => {
+    const confirmed = window.confirm(
+      'Reset every student\u2019s score to zero for a new session? Badges, notes, buckets, and history are kept.'
+    );
+    if (!confirmed) return;
+    studentService.resetAllScores(classroom);
+    classModeService.clearUndoStack(classroom);
+    workspaceService.save();
+    showToast('Session reset');
+    rerender();
+  });
 
   const settingsButton = document.createElement('button');
   settingsButton.type = 'button';
@@ -90,11 +129,85 @@ export function renderTrackerView(container, { classroom, onBack, onSettings, on
   } else {
     classroom.teams.forEach((team) => {
       grid.appendChild(
-        createTeamCardElement(team, getTeamScore(team), { onStudentClick: onSelectStudent })
+        createTeamCardElement(team, getTeamScore(team), {
+          highlightTeamId: highlight.teamId,
+          onTap: (student) => handleTap(classroom, team, student, rerender),
+          onSwipeLeft: (student) => handleSwipeLeft(classroom, team, student, rerender),
+          onLongPress: (student) => handleLongPress(classroom, team, student, { onSelectStudent, rerender }),
+        })
       );
     });
   }
 
   wrapper.append(header, grid);
   container.appendChild(wrapper);
+
+  if (highlight.studentId) {
+    const pulseEl = container.querySelector(`[data-student-id="${highlight.studentId}"] .student-row__points`);
+    pulseEl?.classList.add('student-row__points--pulse');
+  }
+}
+
+function handleTap(classroom, team, student, rerender) {
+  classModeService.awardStar(classroom, student);
+  workspaceService.save();
+  showToast(`+1 Star awarded to ${student.name}`);
+  rerender({ studentId: student.id, teamId: team.id });
+}
+
+function handleSwipeLeft(classroom, team, student, rerender) {
+  classModeService.deductPoint(classroom, student);
+  workspaceService.save();
+  showToast(`-1 Negative recorded for ${student.name}`);
+  rerender({ studentId: student.id, teamId: team.id });
+}
+
+function handleLongPress(classroom, team, student, { onSelectStudent, rerender }) {
+  openQuickActionsSheet({
+    student,
+    bucketOptions: classModeService.getBucketOptions(),
+    onAwardBadge: () => {
+      const catalog = badgeService.listCatalog(classroom);
+      const availableBadges = catalog.filter((badge) => !(student.badges || []).includes(badge));
+      openAwardBadgeModal({
+        availableBadges,
+        onAwardExisting: (badgeName) => {
+          const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
+          if (entry) {
+            workspaceService.save();
+            showToast(`${badgeName} Badge awarded`);
+            rerender();
+          }
+        },
+        onCreateAndAward: (badgeName) => {
+          badgeService.addBadgeToCatalog(classroom, badgeName);
+          const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
+          if (entry) {
+            workspaceService.save();
+            showToast(`${badgeName} Badge awarded`);
+            rerender();
+          }
+        },
+      });
+    },
+    onAddNote: () => {
+      openAddNoteModal({
+        onSave: ({ teacherName, content }) => {
+          noteService.addNote(student, { teacherName, content });
+          workspaceService.save();
+          showToast('Note added');
+          rerender();
+        },
+      });
+    },
+    onChangeBucket: (bucketKey) => {
+      const entry = classModeService.changeBucketQuick(classroom, student, bucketKey);
+      if (entry) {
+        workspaceService.save();
+        showToast(`Bucket changed for ${student.name}`);
+        rerender();
+      }
+    },
+    onOpenProfile: () => onSelectStudent(student.id),
+  });
 }

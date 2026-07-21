@@ -2,27 +2,22 @@
  * ui/components/TeamCard.js
  *
  * Renders one team card: a header with the team name and total score,
- * and a list of students and their scores. Every student row is a
- * button — clicking it opens that student's profile (see
- * ui/views/StudentProfileView.js) via the onStudentClick handler the
- * caller supplies.
+ * and the list of students (see ClassModeStudentRow.js for the actual
+ * tap/swipe/long-press interactions). The header is tinted with the
+ * team's assigned colour; a student's row uses their Learning Bucket as
+ * its visual identity (soft pastel background + coloured left border) —
+ * unchanged from earlier sprints.
  *
- * A student's row uses their Learning Bucket as its visual identity: a
- * soft pastel background and a coloured left border (never a bright
- * solid colour) — see config/bucketConfig.js's BUCKET_ROW_STYLES. This
- * is deliberately not a small dot; the bucket should be readable at a
- * glance across the whole row while keeping good contrast for the
- * student's name.
- *
- * The header is tinted with the team's assigned colour (see
- * config/groupColorConfig.js) — group colour and bucket colour are
- * independent of one another.
+ * `highlightTeamId` triggers a one-shot "pulse" animation on this card's
+ * total when it was the team whose score just changed. Since every
+ * action fully re-renders the tracker, this element is always freshly
+ * created, so the CSS animation just plays on mount — no cleanup needed.
  */
 
 import { getGroupColorHex } from '../../config/groupColorConfig.js';
-import { getBucketRowStyle } from '../../config/bucketConfig.js';
+import { createClassModeStudentRow } from './ClassModeStudentRow.js';
 
-export function createTeamCardElement(team, teamScore, { onStudentClick } = {}) {
+export function createTeamCardElement(team, teamScore, { onTap, onSwipeLeft, onLongPress, highlightTeamId } = {}) {
   const card = document.createElement('article');
   card.className = 'team-card';
   card.dataset.teamId = team.id;
@@ -37,6 +32,9 @@ export function createTeamCardElement(team, teamScore, { onStudentClick } = {}) 
 
   const total = document.createElement('span');
   total.className = 'team-card__total';
+  if (highlightTeamId && team.id === highlightTeamId) {
+    total.classList.add('team-card__total--pulse');
+  }
   total.textContent = String(teamScore);
   total.setAttribute('aria-label', `${team.name} total score`);
 
@@ -45,37 +43,9 @@ export function createTeamCardElement(team, teamScore, { onStudentClick } = {}) 
   const list = document.createElement('ul');
   list.className = 'student-list';
   team.students.forEach((student) => {
-    list.appendChild(createStudentRowElement(student, { onClick: onStudentClick }));
+    list.appendChild(createClassModeStudentRow(student, { onTap, onSwipeLeft, onLongPress }));
   });
 
   card.append(header, list);
   return card;
-}
-
-function createStudentRowElement(student, { onClick } = {}) {
-  const style = getBucketRowStyle(student.bucket);
-
-  const item = document.createElement('li');
-  item.className = 'student-row';
-  item.style.backgroundColor = style.background;
-  item.style.borderLeftColor = style.border;
-
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'student-row__button';
-  button.dataset.studentId = student.id;
-  button.setAttribute('aria-label', `Open ${student.name}'s profile`);
-  button.addEventListener('click', () => onClick?.(student.id));
-
-  const name = document.createElement('span');
-  name.className = 'student-row__name';
-  name.textContent = student.name;
-
-  const score = document.createElement('span');
-  score.className = 'student-row__points';
-  score.textContent = String(student.score);
-
-  button.append(name, score);
-  item.appendChild(button);
-  return item;
 }

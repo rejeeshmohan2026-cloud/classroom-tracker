@@ -16,22 +16,23 @@ import { createLearningActivity } from '../models/LearningActivity.js';
 import { logEntry } from './timelineService.js';
 
 export function createActivity(classroom, { title, type, dueDate = '' }) {
+  if (!classroom.learningActivities) classroom.learningActivities = [];
   const activity = createLearningActivity({ title, type, dueDate });
   classroom.learningActivities.push(activity);
   return activity;
 }
 
 export function listActivities(classroom) {
-  return classroom.learningActivities;
+  return classroom.learningActivities || [];
 }
 
 export function getActivityById(classroom, activityId) {
-  return classroom.learningActivities.find((activity) => activity.id === activityId) || null;
+  return (classroom.learningActivities || []).find((activity) => activity.id === activityId) || null;
 }
 
 export function deleteActivity(classroom, activityId) {
-  const before = classroom.learningActivities.length;
-  classroom.learningActivities = classroom.learningActivities.filter(
+  const before = (classroom.learningActivities || []).length;
+  classroom.learningActivities = (classroom.learningActivities || []).filter(
     (activity) => activity.id !== activityId
   );
   return classroom.learningActivities.length < before;
@@ -92,7 +93,7 @@ export function getSubmissionSummary(classroom, student) {
     'Not Assigned': 0,
   };
 
-  classroom.learningActivities.forEach((activity) => {
+  (classroom.learningActivities || []).forEach((activity) => {
     const status = getSubmissionStatus(student, activity.id);
     summary[status] = (summary[status] || 0) + 1;
   });

@@ -113,7 +113,8 @@ select {
 .btn:focus-visible,
 input:focus-visible,
 select:focus-visible,
-.student-row__button:focus-visible,
+.student-row__surface:focus-visible,
+.student-row__more:focus-visible,
 .wizard-checklist__row:focus-visible {
   outline: 3px solid var(--color-yellow);
   outline-offset: 2px;
@@ -408,15 +409,18 @@ select:focus-visible,
   border-radius: var(--radius-control);
   border-left: 4px solid transparent;
   overflow: hidden;
+  display: flex;
+  align-items: stretch;
 }
 
-.student-row__button {
+.student-row__surface {
+  flex: 1;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
+  padding: 0.85rem 0.85rem;
   background: none;
   border: none;
   border-radius: var(--radius-control);
@@ -424,10 +428,34 @@ select:focus-visible,
   font-size: 0.95rem;
   color: var(--color-ink);
   cursor: pointer;
-  transition: background-color 0.15s ease;
+  user-select: none;
+  touch-action: pan-y;
+  transition: transform 0.15s ease;
 }
-.student-row__button:hover {
+.student-row__surface--dragging {
+  transition: none;
+}
+.student-row__surface:hover {
   background-color: rgba(0, 0, 0, 0.03);
+}
+
+.student-row__more {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+}
+.student-row__more:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--color-ink);
 }
 
 .student-row__name {
@@ -1332,6 +1360,154 @@ button.wizard-checklist__row:hover {
   margin: 1rem 0;
 }
 
+/* Toast notifications */
+
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Bottom sheet (Quick Actions) */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(26, 26, 26, 0);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 250;
+  transition: background-color 0.2s ease;
+}
+.sheet-overlay--visible {
+  background-color: rgba(26, 26, 26, 0.45);
+}
+
+.bottom-sheet {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--color-surface);
+  border-radius: 20px 20px 0 0;
+  padding: 0.75rem 1.25rem 1.5rem;
+  transform: translateY(100%);
+  transition: transform 0.22s ease;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+.bottom-sheet--visible {
+  transform: translateY(0);
+}
+
+.bottom-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  margin: 0 auto 0.85rem;
+}
+
+.bottom-sheet__name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin: 0;
+  text-align: center;
+}
+
+.bottom-sheet__bucket {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 0.2rem 0 1rem;
+}
+
+.bottom-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.bottom-sheet__action {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: left;
+  background-color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+.bottom-sheet__action:hover {
+  background-color: rgba(14, 192, 226, 0.1);
+}
+
+.bottom-sheet__action-icon {
+  font-size: 1.3rem;
+  width: 1.6rem;
+  text-align: center;
+}
+
+.bottom-sheet__cancel {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+/* Score-pulse animation (plays once on mount; safe since every action
+   fully re-renders, so this is always a freshly created element) */
+
+@keyframes score-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.student-row__points--pulse,
+.team-card__total--pulse {
+  animation: score-pulse 0.35s ease;
+}
+
 /* Accessibility & responsiveness */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1344,6 +1520,16 @@ button.wizard-checklist__row:hover {
   }
   .classroom-card:hover {
     transform: none;
+  }
+  .student-row__points--pulse,
+  .team-card__total--pulse {
+    animation: none;
+  }
+  .toast,
+  .bottom-sheet,
+  .sheet-overlay,
+  .student-row__surface {
+    transition: none;
   }
 }
 

@@ -13,6 +13,8 @@ import { createTeam } from '../models/Team.js';
 import { createStudent } from '../models/Student.js';
 import { getDefaultGroupColor } from '../config/groupColorConfig.js';
 import { isNonEmptyString } from '../utils/validators.js';
+import { buildDefaultSettings } from '../config/classroomDefaults.js';
+import { DEFAULT_BADGE_CATALOG } from '../config/badgeConfig.js';
 
 export class ClassroomValidationError extends Error {}
 
@@ -25,10 +27,53 @@ function validateDetails(details) {
   }
 }
 
+/**
+ * Backfills fields onto a classroom (and its teams/students/settings)
+ * that may not exist yet on data saved by an earlier version of this
+ * app — e.g. a classroom saved before Learning Activities, the badge
+ * catalog, or per-student notes/badges/history existed. Without this,
+ * loading old localStorage data throws deep inside rendering (e.g.
+ * `classroom.learningActivities.forEach` on undefined) the moment a
+ * screen that needs a newer field opens, which looks like "nothing
+ * happens" rather than a clear error.
+ */
+function normalizeClassroom(classroom) {
+  const defaults = buildDefaultSettings();
+
+  classroom.administrators = classroom.administrators || [];
+  classroom.teachers = classroom.teachers || [];
+  classroom.teams = (classroom.teams || []).map(normalizeTeam);
+  classroom.learningActivities = classroom.learningActivities || [];
+
+  classroom.settings = classroom.settings || {};
+  classroom.settings.bucketScoring = classroom.settings.bucketScoring || defaults.bucketScoring;
+  classroom.settings.scoring = classroom.settings.scoring || defaults.scoring;
+  classroom.settings.badgeCatalog = classroom.settings.badgeCatalog || [...DEFAULT_BADGE_CATALOG];
+  classroom.settings.setupProgress = classroom.settings.setupProgress || defaults.setupProgress;
+
+  return classroom;
+}
+
+function normalizeTeam(team) {
+  team.color = team.color ?? null;
+  team.students = (team.students || []).map(normalizeStudent);
+  return team;
+}
+
+function normalizeStudent(student) {
+  student.score = student.score ?? 0;
+  student.bucket = student.bucket ?? null;
+  student.badges = student.badges || [];
+  student.notes = student.notes || [];
+  student.submissions = student.submissions || {};
+  student.history = student.history || [];
+  return student;
+}
+
 let classrooms = [];
 
 export function replaceClassrooms(newClassrooms = []) {
-  classrooms = newClassrooms;
+  classrooms = newClassrooms.map(normalizeClassroom);
   return classrooms;
 }
 
