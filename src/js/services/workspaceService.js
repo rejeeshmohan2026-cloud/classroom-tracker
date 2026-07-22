@@ -71,7 +71,7 @@ function persistDelete(classroomId) {
  * device) or immediately after a local write — so the caller can
  * re-render without the user ever needing to refresh manually.
  */
-export async function initForUser(uid, onChange) {
+export async function initForUser(uid, onChange, onError) {
   // TEMPORARY DEBUG LOGGING — remove after cross-device investigation.
   console.log('[WORKSPACE]');
   console.log('initForUser UID:', uid);
@@ -94,6 +94,9 @@ export async function initForUser(uid, onChange) {
     },
     (error) => {
       console.error('[workspaceService] Firestore subscription error:', error);
+      // Optional — added only so the temporary debug panel can surface
+      // this; existing callers that don't pass onError are unaffected.
+      onError?.(error);
     }
   );
 }

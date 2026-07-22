@@ -30,9 +30,21 @@ import { renderActivitiesListView, renderActivityRosterView } from './ui/views/A
 import { renderLoginView } from './ui/views/LoginView.js';
 import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
+// TEMPORARY, for the cross-device investigation — remove these two
+// imports along with initDebugPanel()/updateDebugPanel() below, and
+// delete ui/components/DebugPanel.js, once done.
+import { renderDebugPanel } from './ui/components/DebugPanel.js';
+import { getFirebaseApp } from './services/firebaseApp.js';
 
 let appContainer = null;
 let userBarContainer = null;
+// TEMPORARY debug-panel state — see note above.
+let debugPanelContainer = null;
+const debugState = { uid: null, projectId: null, classroomCount: 0, error: null };
+
+function updateDebugPanel() {
+  renderDebugPanel(debugPanelContainer, debugState);
+}
 let currentUser = null;
 let workspaceLoading = false;
 
@@ -178,13 +190,30 @@ function init() {
   appContainer = document.getElementById('app');
   userBarContainer = document.getElementById('user-bar');
 
+  // TEMPORARY debug panel setup — see note near the top of this file.
+  debugPanelContainer = document.createElement('div');
+  document.body.appendChild(debugPanelContainer);
+  updateDebugPanel();
+
   // Registered once — renderRoute() itself checks auth/loading state on
   // every call, so this doesn't need to be re-attached on sign-in/out.
   router.onRouteChange(renderRoute);
 
   authService.initAuth();
+  // TEMPORARY — project ID doesn't depend on sign-in state, so grab it once.
+  debugState.projectId = getFirebaseApp().options.projectId || null;
+  updateDebugPanel();
+
   authService.onAuthStateChange((user) => {
     currentUser = user;
+
+    // TEMPORARY debug panel update.
+    debugState.uid = user?.uid || null;
+    if (!user) {
+      debugState.classroomCount = 0;
+      debugState.error = null;
+    }
+    updateDebugPanel();
 
     if (!user) {
       workspaceService.stopListening();
@@ -196,13 +225,28 @@ function init() {
     renderRoute(router.getCurrentRoute());
 
     workspaceService
-      .initForUser(user.uid, () => {
-        workspaceLoading = false;
-        renderRoute(router.getCurrentRoute());
-      })
+      .initForUser(
+        user.uid,
+        () => {
+          workspaceLoading = false;
+          // TEMPORARY debug panel update.
+          debugState.classroomCount = workspaceService.getState().classrooms.length;
+          debugState.error = null;
+          updateDebugPanel();
+          renderRoute(router.getCurrentRoute());
+        },
+        (error) => {
+          // TEMPORARY — surfaces snapshot-level errors to the debug panel.
+          debugState.error = error?.message || String(error);
+          updateDebugPanel();
+        }
+      )
       .catch((error) => {
         console.error('[main] Failed to load classrooms:', error);
         workspaceLoading = false;
+        // TEMPORARY debug panel update.
+        debugState.error = error?.message || String(error);
+        updateDebugPanel();
         window.alert('We couldn\u2019t load your classrooms. Please check your connection and try again.');
         renderRoute(router.getCurrentRoute());
       });
