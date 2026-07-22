@@ -1,11 +1,19 @@
 /**
  * ui/components/RecognitionWidget.js
  *
- * The Recognition Wall — the Dashboard's top section. Entirely
- * config-driven: iterates config/recognitionCategories.js and asks
+ * The Recognition Wall — the Dashboard's top section, and the "breadth"
+ * view: every category at a glance, this week only, no depth. The
+ * dedicated Recognition Screen (ui/views/RecognitionScreenView.js) is
+ * the "depth" counterpart — one category in focus, full leaderboard,
+ * every period. Entirely config-driven: iterates
+ * config/recognitionCategories.js and asks
  * services/studentProgressService.js for this week's winner(s) of each.
- * Adding a new category later requires no change to this file — see
- * docs/PROGRESS_ENGINE.md §7.
+ *
+ * Renders each category using the shared ui/components/RecognitionCard.js
+ * (compact variant) — this file used to have its own private card-building
+ * function; it's been removed in favor of the shared component so the
+ * Wall and the Recognition Screen never drift apart in how a winner is
+ * displayed.
  *
  * Categories with no winner this week are omitted individually (not
  * shown with a "no winner" placeholder each) — if literally nothing has
@@ -14,16 +22,30 @@
 
 import { RECOGNITION_CATEGORIES } from '../../config/recognitionCategories.js';
 import * as studentProgressService from '../../services/studentProgressService.js';
+import { createRecognitionCardElement } from './RecognitionCard.js';
 import { createEmptyStateElement } from './EmptyState.js';
 
-export function createRecognitionWidgetElement({ classroom }) {
+export function createRecognitionWidgetElement({ classroom, onViewAll }) {
   const widget = document.createElement('div');
   widget.className = 'dashboard-widget dashboard-widget--recognition';
 
+  const header = document.createElement('div');
+  header.className = 'dashboard-widget__header-row';
   const heading = document.createElement('h2');
   heading.className = 'dashboard-widget__heading';
   heading.textContent = '\ud83c\udfc6 Recognition Wall';
-  widget.appendChild(heading);
+  header.appendChild(heading);
+
+  if (onViewAll) {
+    const viewAllLink = document.createElement('button');
+    viewAllLink.type = 'button';
+    viewAllLink.className = 'btn btn--text';
+    viewAllLink.textContent = 'View All \u2192';
+    viewAllLink.addEventListener('click', onViewAll);
+    header.appendChild(viewAllLink);
+  }
+
+  widget.appendChild(header);
 
   const categoriesWithWinners = RECOGNITION_CATEGORIES.filter((category) => category.periods.includes('week'))
     .map((category) => ({
@@ -41,29 +63,9 @@ export function createRecognitionWidgetElement({ classroom }) {
   cardRow.className = 'recognition-card-row';
 
   categoriesWithWinners.forEach(({ category, winners }) => {
-    cardRow.appendChild(createRecognitionCard(category, winners));
+    cardRow.appendChild(createRecognitionCardElement({ category, winners, period: 'week', variant: 'compact' }));
   });
 
   widget.appendChild(cardRow);
   return widget;
-}
-
-function createRecognitionCard(category, winners) {
-  const card = document.createElement('div');
-  card.className = 'recognition-card';
-
-  const icon = document.createElement('div');
-  icon.className = 'recognition-card__icon';
-  icon.textContent = category.icon;
-
-  const label = document.createElement('div');
-  label.className = 'recognition-card__label';
-  label.textContent = category.label;
-
-  const names = document.createElement('div');
-  names.className = 'recognition-card__names';
-  names.textContent = winners.map((winner) => winner.studentName || winner.teamName).join(' & ');
-
-  card.append(icon, label, names);
-  return card;
 }

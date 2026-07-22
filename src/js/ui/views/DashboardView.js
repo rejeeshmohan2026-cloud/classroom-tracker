@@ -45,7 +45,7 @@ import { createTeachingSectionElement } from '../components/TeachingSection.js';
 import { createClassroomSectionElement } from '../components/ClassroomSection.js';
 
 export function renderDashboardView(container, props) {
-  const { classroom, currentUser, onOpenSettings, onOpenNotebookTracker, onOpenGroups, onStartClassMode, onSelectNotebook } = props;
+  const { classroom, currentUser, onOpenSettings, onOpenNotebookTracker, onOpenGroups, onStartClassMode, onSelectNotebook, onOpenRecognition } = props;
 
   container.innerHTML = '';
 
@@ -69,7 +69,7 @@ export function renderDashboardView(container, props) {
   content.className = 'dashboard-view__content';
 
   // 1. What should I celebrate?
-  content.appendChild(createRecognitionWidgetElement({ classroom }));
+  content.appendChild(createRecognitionWidgetElement({ classroom, onViewAll: onOpenRecognition }));
   content.appendChild(createWeeklySnapshotWidgetElement({ classroom }));
 
   // 2. What needs my attention?

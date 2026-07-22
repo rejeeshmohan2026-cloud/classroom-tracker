@@ -32,6 +32,7 @@ import { renderNotebookTrackerView } from './ui/views/NotebookTrackerView.js';
 import { renderNotebookRegisterView } from './ui/views/NotebookRegisterView.js';
 import { renderNotebookTimelineView } from './ui/views/NotebookTimelineView.js';
 import { renderDashboardView } from './ui/views/DashboardView.js';
+import { renderRecognitionScreenView } from './ui/views/RecognitionScreenView.js';
 import { renderLoginView } from './ui/views/LoginView.js';
 import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
@@ -75,6 +76,7 @@ function handleNewClassroom() {
 const CLASSROOM_ROUTE_NAMES = [
   'dashboard',
   'tracker',
+  'recognition',
   'settings',
   'setup',
   'studentProfile',
@@ -127,6 +129,17 @@ function renderRoute(route) {
         onStartClassMode: () => router.navigate(`/classroom/${classroom.id}/class-mode`),
         onSelectNotebook: (subjectId, notebookTypeId) =>
           router.navigate(`/classroom/${classroom.id}/notebooks/${subjectId}/${notebookTypeId}`),
+        onOpenRecognition: () => router.navigate(`/classroom/${classroom.id}/recognition`),
+      });
+    } else if (route.name === 'recognition') {
+      renderRecognitionScreenView(appContainer, {
+        classroom,
+        period: route.period,
+        categoryId: route.categoryId,
+        onBack: () => router.navigate(`/classroom/${classroom.id}`),
+        onNavigatePeriod: (period) => router.navigate(`/classroom/${classroom.id}/recognition/${period}`),
+        onNavigateCategory: (period, categoryId) =>
+          router.navigate(`/classroom/${classroom.id}/recognition/${period}/${categoryId}`),
       });
     } else if (route.name === 'tracker') {
       renderTrackerView(appContainer, {

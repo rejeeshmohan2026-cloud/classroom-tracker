@@ -14,6 +14,7 @@
  *   #/classroom/{id}/notebooks                                       -> notebook tracker list (Subject × Notebook Type)
  *   #/classroom/{id}/notebooks/{subjectId}/{typeId}/{dateKey?}        -> register view (today if dateKey omitted)
  *   #/classroom/{id}/notebooks/{subjectId}/{typeId}/timeline/{yearMonth?} -> timeline view (current month if omitted)
+ *   #/classroom/{id}/recognition/{period?}/{categoryId?}     -> recognition screen (defaults resolved by the view itself)
  * Deep links work on refresh since the route is derived from the URL,
  * not from in-memory state.
  */
@@ -25,6 +26,9 @@ function parseHash() {
   if (parts[0] === 'classroom' && parts[1]) {
     if (parts[2] === 'class-mode') {
       return { name: 'tracker', classroomId: parts[1] };
+    }
+    if (parts[2] === 'recognition') {
+      return { name: 'recognition', classroomId: parts[1], period: parts[3] || null, categoryId: parts[4] || null };
     }
     if (parts[2] === 'settings') {
       return { name: 'settings', classroomId: parts[1], section: parts[3] || 'general' };

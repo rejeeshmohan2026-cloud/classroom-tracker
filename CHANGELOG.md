@@ -158,3 +158,60 @@ Full Playwright pass confirmed: section headings render correctly grouping the i
 
 ### Future TODOs
 (Unchanged from the original Phase 2 entry — this refactor didn't add or resolve any.)
+
+---
+
+## Phase 3 — Recognition Experience
+
+**Scope:** a dedicated Recognition Screen, two newly-extracted reusable components (`RecognitionCard`, `LeaderboardList`), and the routing/navigation connecting it to the Dashboard's existing Recognition Wall. Implemented in the approved order: extract `RecognitionCard` → extract `LeaderboardList` → build `RecognitionScreenView` → wire Dashboard "View All" → routing → regression testing → documentation. The Progress Engine (`studentProgressService.js`) was not modified at all this phase — every new screen and component consumes functions that already existed from Phase 1.
+
+### Features Added
+- **Recognition Screen** (`/classroom/{id}/recognition/{period?}/{categoryId?}`): period tabs (This Week / This Month / All Time), categories grouped by purpose (🏆 Performance, 📈 Growth, 🤝 Team, ⭐ Special Recognition), a full Winner Card for the selected category/period, and its leaderboard embedded directly below with in-place expand/collapse ("Show all" / "Show less" — no navigation, no separate page).
+- **`RecognitionCard`**, extracted from a private function inside `RecognitionWidget.js` into its own reusable component with two variants: `compact` (Dashboard Wall — icon, label, names only) and `full` (Recognition Screen — adds reason, a prominently-formatted key statistic, and the period). Handles co-winners (never truncated) and a distinct Team Champion presentation (group icon + team name, not student initials).
+- **`LeaderboardList`**, extracted as a fully generic, reusable ranked-list component — knows nothing about recognition categories, only renders whatever `entries`/`formatValue` it's given.
+- **Recognition config extended**: `recognitionCategories.js` gained a `group` field (replacing the earlier, effectively-unused `kind`/`RECOGNITION_KINDS`), a `reasonText` per category (the Card's "Why?" answer), and a new `FUTURE_RECOGNITION_PLACEHOLDERS` list (Most Improved, Teacher's Choice, Most Helpful, Best Reader, Best Speaker, Creative Thinker, Perfect Attendance) rendered as visibly-disabled chips on the Recognition Screen — communicating "more is coming" without any computed data or fake resolver behind them.
+- **Dashboard "View All"**: a small link in the Recognition Wall's header, navigating to the Recognition Screen at its default period/category.
+- **Category/period auto-redirect**: selecting a period that the current category doesn't support (e.g. switching to "All Time" while viewing Biggest Climber, which only supports week/month) redirects to the first category that *does* support it, keeping the URL always valid and shareable rather than silently rendering a mismatched state.
+
+### Files Created
+- `src/js/ui/components/RecognitionCard.js`
+- `src/js/ui/components/LeaderboardList.js`
+- `src/js/ui/views/RecognitionScreenView.js`
+
+### Files Modified
+- `src/js/config/recognitionCategories.js` — `kind`/`RECOGNITION_KINDS` replaced with `group`/`RECOGNITION_GROUPS`/`RECOGNITION_GROUP_LABELS`/`RECOGNITION_GROUP_ORDER`; added `reasonText` per category; added `FUTURE_RECOGNITION_PLACEHOLDERS`.
+- `src/js/ui/components/RecognitionWidget.js` — now consumes the shared `RecognitionCard` (compact variant) instead of its own private card-building function; added the "View All" link.
+- `src/js/ui/views/DashboardView.js` — threads `onOpenRecognition` through to the Recognition widget.
+- `src/js/ui/router.js` — added `/classroom/{id}/recognition/{period?}/{categoryId?}`.
+- `src/js/main.js` — added `'recognition'` to the classroom route names; added the route dispatch branch; wired `onOpenRecognition` on the dashboard route.
+- `src/css/styles.css` — replaced the old flat `.recognition-card` rules (compact-only) with variant-aware rules (`--compact`/`--full`), co-winner row layout, and new rules for the Recognition Screen's tabs/chips and the Leaderboard List.
+
+### Routing Changes
+| Path | Resolves to |
+|---|---|
+| `/classroom/{id}/recognition` | Recognition Screen, defaults to this week / first available category |
+| `/classroom/{id}/recognition/{period}` | Recognition Screen, period selected, first available category for it |
+| `/classroom/{id}/recognition/{period}/{categoryId}` | Both selected — deep-linkable and shareable |
+
+No other existing route changed.
+
+### Breaking Changes
+None. `RECOGNITION_KINDS` was exported but never actually consumed anywhere in rendering logic (confirmed by grep before removing it) — its replacement by `group` has no observable effect on anything built in Phases 1–2.
+
+### Regression Verification
+Full Playwright pass confirmed: co-winner ties render correctly on both the Dashboard Wall and the Recognition Screen; all four group headings and all seven disabled placeholder chips render; the leaderboard's "Show all"/"Show less" toggle works in place with zero navigation; period-switching correctly auto-redirects away from a category that doesn't support the new period (Biggest Climber + All Time); empty states render correctly for a category with no winner. Separately, a full regression pass confirmed every Phase 1/2 feature (Settings, Notebook Tracker, Register View, Timeline View, Class Mode scoring, Dashboard's Teaching/Classroom sections) continues to work unchanged.
+
+### Architectural Decisions Made During Implementation
+- **The Progress Engine was not touched.** Every new screen/component consumes `getRecognitionWinners()`/`getLeaderboard()` exactly as Phase 1 built them — Phase 3 is purely a presentation-layer expansion, matching the explicit instruction to implement "using the existing Progress Engine without modifying its architecture."
+- **`FUTURE_RECOGNITION_PLACEHOLDERS` is a separate list from `RECOGNITION_CATEGORIES`**, not the same array with a "disabled" flag — keeping real, computable categories and inert placeholders structurally distinct means `getRecognitionWinners()`/`getLeaderboard()` never need to special-case "a category with no resolver."
+- **Formatting logic (key statistic strings, leaderboard value strings) lives in the UI layer** (`RecognitionCard.js`, `RecognitionScreenView.js`), not in config or the Progress Engine — `studentProgressService.js` returns plain structured data (numbers, names, ranks) only; every "5 Stars" / "12-Day Streak" / "+4 Rank Positions" string is assembled at render time from that data. This is also precisely what makes the future-certificate design goal achievable without engine changes.
+- **`LeaderboardList` deliberately has zero knowledge of recognition categories** — it accepts entries and a `formatValue` function from its caller, so it's genuinely reusable (e.g. for a future dedicated Group Leaderboard) rather than reusable in name only.
+
+### Future TODOs
+- True per-subject filtering for the Subjects widget (carried over from Phase 2 — still unresolved).
+- Build the teacher-only Student Dashboard preview (Phase 4) — no authentication, no student accounts.
+- Printable certificate / Wall of Fame / assembly-announcement presentation of `RecognitionCard` — designed for, not built.
+- Teacher's Choice, once implemented, needs its own explicitly write-capable service (e.g. `teacherChoiceService.js`), kept separate from the read-only Progress Engine — see the Phase 3 design discussion.
+- Perfect Attendance needs an attendance data source before it can move from placeholder to computed category.
+- Student/Parent onboarding remains blocked pending AI Working Committee review.
+- Visual/theme/animation polish — explicitly deferred to Phase 5.
