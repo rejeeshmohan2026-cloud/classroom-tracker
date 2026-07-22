@@ -25,6 +25,7 @@ import { buildDefaultSettings } from '../config/classroomDefaults.js';
 import { DEFAULT_BADGE_CATALOG } from '../config/badgeConfig.js';
 import * as memberService from './memberService.js';
 import { MEMBER_ROLES } from '../config/memberRoles.js';
+import * as notebookService from './notebookService.js';
 
 export class ClassroomValidationError extends Error {}
 
@@ -55,6 +56,16 @@ function normalizeClassroom(classroom) {
 
   classroom.teams = (classroom.teams || []).map(normalizeTeam);
   classroom.learningActivities = classroom.learningActivities || [];
+  classroom.notebookConfig = classroom.notebookConfig || { subjects: [], notebookTypes: [] };
+  classroom.notebookConfig.subjects = classroom.notebookConfig.subjects || [];
+  classroom.notebookConfig.notebookTypes = classroom.notebookConfig.notebookTypes || [];
+  // Legacy, pre-timeline shape — left in place, unused, read only once by
+  // the migration fold below.
+  classroom.notebookCheckTemplates = classroom.notebookCheckTemplates || {};
+  classroom.notebookChecks = classroom.notebookChecks || {};
+  classroom.notebooks = classroom.notebooks || {};
+  notebookService.migrateLegacyChecksIfNeeded(classroom);
+  classroom.classroomJoinCode = classroom.classroomJoinCode ?? null;
 
   classroom.settings = classroom.settings || {};
   classroom.settings.bucketScoring = classroom.settings.bucketScoring || defaults.bucketScoring;

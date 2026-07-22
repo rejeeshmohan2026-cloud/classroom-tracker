@@ -28,7 +28,7 @@ import { getTeamScore } from '../../services/teamService.js';
 import { getDisplayName, getDisplaySubtitle } from '../../services/classroomService.js';
 
 export function renderTrackerView(container, props) {
-  const { classroom, onBack, onSettings, onActivities, onSelectStudent } = props;
+  const { classroom, onBack, onSettings, onActivities, onNotebooks, onSelectStudent } = props;
   const highlight = props._highlight || {};
 
   container.innerHTML = '';
@@ -113,7 +113,13 @@ export function renderTrackerView(container, props) {
   activitiesButton.textContent = 'Learning Activities';
   activitiesButton.addEventListener('click', onActivities);
 
-  actions.append(undoButton, resetButton, activitiesButton, settingsButton);
+  const notebooksButton = document.createElement('button');
+  notebooksButton.type = 'button';
+  notebooksButton.className = 'btn btn--ghost';
+  notebooksButton.textContent = 'Notebook Tracker';
+  notebooksButton.addEventListener('click', onNotebooks);
+
+  actions.append(undoButton, resetButton, activitiesButton, notebooksButton, settingsButton);
   header.append(backButton, titleBlock, actions);
 
   const grid = document.createElement('section');

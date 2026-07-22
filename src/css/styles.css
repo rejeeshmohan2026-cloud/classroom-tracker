@@ -1606,6 +1606,151 @@ button.wizard-checklist__row:hover {
   color: var(--color-cyan);
 }
 
+/* Notebook Tracker — Register View (fast entry) and Timeline View (read-only) */
+
+.notebook-checking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.notebook-checking-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.notebook-checking-row__name {
+  flex: 1 1 160px;
+  font-weight: 600;
+  min-width: 140px;
+}
+
+.toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.toggle-group__button {
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.4rem 0.65rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.toggle-group__button:hover {
+  border-color: var(--color-cyan);
+}
+.toggle-group__button--active {
+  border-color: var(--color-cyan);
+  background-color: var(--color-cyan);
+  color: var(--color-surface);
+}
+
+.toggle-group__button:focus-visible {
+  outline: 3px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+/* Date/month navigation bar (Register View + Timeline View) */
+
+.notebook-date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem 1rem;
+}
+
+.notebook-date-bar__label {
+  font-weight: 700;
+  min-width: 10rem;
+  text-align: center;
+}
+
+.notebook-date-bar__today-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background-color: var(--color-cyan);
+  color: var(--color-surface);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+/* Timeline strip (student-first: one row per student) */
+
+.notebook-timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.notebook-timeline-row:last-child {
+  border-bottom: none;
+}
+
+.notebook-timeline-row__label {
+  flex: 0 0 140px;
+  font-weight: 600;
+}
+
+.notebook-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.notebook-timeline__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.95rem;
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  cursor: default;
+}
+
+.notebook-timeline-legend {
+  letter-spacing: 0.02em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle-group__button {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .notebook-checking-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .notebook-timeline-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 /* Accessibility & responsiveness */
 
 @media (prefers-reduced-motion: reduce) {

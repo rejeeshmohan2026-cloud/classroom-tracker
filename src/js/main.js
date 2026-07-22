@@ -27,24 +27,15 @@ import { renderSettingsView } from './ui/views/SettingsView.js';
 import { renderSetupWizardView } from './ui/views/SetupWizardView.js';
 import { renderStudentProfileView } from './ui/views/StudentProfileView.js';
 import { renderActivitiesListView, renderActivityRosterView } from './ui/views/ActivitiesView.js';
+import { renderNotebookTrackerView } from './ui/views/NotebookTrackerView.js';
+import { renderNotebookRegisterView } from './ui/views/NotebookRegisterView.js';
+import { renderNotebookTimelineView } from './ui/views/NotebookTimelineView.js';
 import { renderLoginView } from './ui/views/LoginView.js';
 import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
-// TEMPORARY, for the cross-device investigation — remove these two
-// imports along with initDebugPanel()/updateDebugPanel() below, and
-// delete ui/components/DebugPanel.js, once done.
-import { renderDebugPanel } from './ui/components/DebugPanel.js';
-import { getFirebaseApp } from './services/firebaseApp.js';
 
 let appContainer = null;
 let userBarContainer = null;
-// TEMPORARY debug-panel state — see note above.
-let debugPanelContainer = null;
-const debugState = { uid: null, projectId: null, classroomCount: 0, error: null };
-
-function updateDebugPanel() {
-  renderDebugPanel(debugPanelContainer, debugState);
-}
 let currentUser = null;
 let workspaceLoading = false;
 
@@ -86,6 +77,9 @@ const CLASSROOM_ROUTE_NAMES = [
   'studentProfile',
   'activitiesList',
   'activityRoster',
+  'notebookTracker',
+  'notebookRegister',
+  'notebookTimeline',
 ];
 
 function renderLoadingScreen(container) {
@@ -126,6 +120,7 @@ function renderRoute(route) {
         onBack: () => router.navigate('/'),
         onSettings: () => router.navigate(`/classroom/${classroom.id}/settings`),
         onActivities: () => router.navigate(`/classroom/${classroom.id}/activities`),
+        onNotebooks: () => router.navigate(`/classroom/${classroom.id}/notebooks`),
         onSelectStudent: (studentId) => router.navigate(`/classroom/${classroom.id}/student/${studentId}`),
       });
     } else if (route.name === 'settings') {
@@ -162,20 +157,48 @@ function renderRoute(route) {
         onSelectActivity: (activityId) =>
           router.navigate(`/classroom/${classroom.id}/activities/${activityId}`),
       });
-    } else {
+    } else if (route.name === 'activityRoster') {
       renderActivityRosterView(appContainer, {
         classroom,
         activityId: route.activityId,
         onBack: () => router.navigate(`/classroom/${classroom.id}/activities`),
+      });
+    } else if (route.name === 'notebookTracker') {
+      renderNotebookTrackerView(appContainer, {
+        classroom,
+        onBack: () => router.navigate(`/classroom/${classroom.id}`),
+        onSelectNotebook: (subjectId, notebookTypeId) =>
+          router.navigate(`/classroom/${classroom.id}/notebooks/${subjectId}/${notebookTypeId}`),
+      });
+    } else if (route.name === 'notebookRegister') {
+      renderNotebookRegisterView(appContainer, {
+        classroom,
+        subjectId: route.subjectId,
+        notebookTypeId: route.notebookTypeId,
+        dateKey: route.dateKey,
+        currentUser,
+        onBack: () => router.navigate(`/classroom/${classroom.id}/notebooks`),
+        onNavigateDate: (dateKey) =>
+          router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}/${dateKey}`),
+        onOpenTimeline: () =>
+          router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}/timeline`),
+      });
+    } else {
+      renderNotebookTimelineView(appContainer, {
+        classroom,
+        subjectId: route.subjectId,
+        notebookTypeId: route.notebookTypeId,
+        yearMonth: route.yearMonth,
+        onBack: () => router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}`),
+        onNavigateMonth: (yearMonth) =>
+          router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}/timeline/${yearMonth}`),
       });
     }
     return;
   }
 
   const { classrooms } = workspaceService.getState();
-  // TEMPORARY DEBUG LOGGING — remove after cross-device investigation.
-  console.log('[MAIN]');
-  console.log('Current classroom count:', classrooms.length);
+  console.log('[main] Home/Welcome decision — classroom count:', classrooms.length);
   if (classrooms.length === 0) {
     renderWelcomeView(appContainer, { onNewClassroom: handleNewClassroom });
   } else {
@@ -191,30 +214,14 @@ function init() {
   appContainer = document.getElementById('app');
   userBarContainer = document.getElementById('user-bar');
 
-  // TEMPORARY debug panel setup — see note near the top of this file.
-  debugPanelContainer = document.createElement('div');
-  document.body.appendChild(debugPanelContainer);
-  updateDebugPanel();
-
   // Registered once — renderRoute() itself checks auth/loading state on
   // every call, so this doesn't need to be re-attached on sign-in/out.
   router.onRouteChange(renderRoute);
 
   authService.initAuth();
-  // TEMPORARY — project ID doesn't depend on sign-in state, so grab it once.
-  debugState.projectId = getFirebaseApp().options.projectId || null;
-  updateDebugPanel();
 
   authService.onAuthStateChange((user) => {
     currentUser = user;
-
-    // TEMPORARY debug panel update.
-    debugState.uid = user?.uid || null;
-    if (!user) {
-      debugState.classroomCount = 0;
-      debugState.error = null;
-    }
-    updateDebugPanel();
 
     if (!user) {
       workspaceService.stopListening();
@@ -226,29 +233,13 @@ function init() {
     renderRoute(router.getCurrentRoute());
 
     workspaceService
-      .initForUser(
-        user.uid,
-        user.displayName,
-        () => {
-          workspaceLoading = false;
-          // TEMPORARY debug panel update.
-          debugState.classroomCount = workspaceService.getState().classrooms.length;
-          debugState.error = null;
-          updateDebugPanel();
-          renderRoute(router.getCurrentRoute());
-        },
-        (error) => {
-          // TEMPORARY — surfaces snapshot-level errors to the debug panel.
-          debugState.error = error?.message || String(error);
-          updateDebugPanel();
-        }
-      )
+      .initForUser(user.uid, user.displayName, () => {
+        workspaceLoading = false;
+        renderRoute(router.getCurrentRoute());
+      })
       .catch((error) => {
         console.error('[main] Failed to load classrooms:', error);
         workspaceLoading = false;
-        // TEMPORARY debug panel update.
-        debugState.error = error?.message || String(error);
-        updateDebugPanel();
         window.alert('We couldn\u2019t load your classrooms. Please check your connection and try again.');
         renderRoute(router.getCurrentRoute());
       });

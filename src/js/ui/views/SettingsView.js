@@ -23,14 +23,16 @@ import * as studentService from '../../services/studentService.js';
 import * as memberService from '../../services/memberService.js';
 import * as workspaceService from '../../services/workspaceService.js';
 import * as setupProgressService from '../../services/setupProgressService.js';
+import * as notebookConfigService from '../../services/notebookConfigService.js';
 import { getDisplayName, ClassroomValidationError } from '../../services/classroomService.js';
 import { MEMBER_ROLES, PERMISSIONS, ROLE_PERMISSIONS } from '../../config/memberRoles.js';
 
-const SECTIONS = ['general', 'students', 'groups', 'teachers', 'permissions', 'danger'];
+const SECTIONS = ['general', 'students', 'groups', 'notebooks', 'teachers', 'permissions', 'danger'];
 const SECTION_LABELS = {
   general: 'General',
   students: 'Students',
   groups: 'Groups',
+  notebooks: 'Notebooks',
   teachers: 'Teachers',
   permissions: 'Permissions',
   danger: 'Danger Zone',
@@ -89,6 +91,7 @@ export function renderSettingsView(container, { classroom, currentUser, section,
     general: (el, cls, rr) => renderGeneralSection(el, cls, rr, onReopenSetupWizard),
     students: renderStudentsSection,
     groups: renderGroupsSection,
+    notebooks: renderNotebooksSection,
     teachers: (el, cls, rr) => renderTeachersSection(el, cls, rr, currentUser),
     permissions: renderPermissionsSection,
     danger: (el) => renderDangerSection(el, classroom, currentUser, onDeleted),
@@ -309,6 +312,122 @@ function renderStudentsSection(content, classroom, rerender) {
 
     section.appendChild(teamBlock);
   });
+
+  content.appendChild(section);
+}
+
+function renderNotebooksSection(content, classroom, rerender) {
+  const section = document.createElement('div');
+  section.className = 'settings-section';
+
+  const heading = document.createElement('h3');
+  heading.className = 'settings-team-block__heading';
+  heading.textContent = 'Subjects & Notebook Types';
+  section.appendChild(heading);
+
+  const note = document.createElement('p');
+  note.className = 'settings-section__meta';
+  note.textContent = 'Configure the subjects and notebook types this classroom uses for Notebook Tracker.';
+  section.appendChild(note);
+
+  const subjects = notebookConfigService.listSubjects(classroom);
+
+  if (subjects.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'settings-section__meta';
+    empty.textContent = 'No subjects yet \u2014 add one below to get started.';
+    section.appendChild(empty);
+  }
+
+  subjects.forEach((subject) => {
+    const subjectBlock = document.createElement('div');
+    subjectBlock.className = 'settings-team-block';
+
+    const subjectRow = document.createElement('div');
+    subjectRow.className = 'settings-editable-list__item';
+
+    const subjectInput = document.createElement('input');
+    subjectInput.type = 'text';
+    subjectInput.value = subject.name;
+    subjectInput.addEventListener('change', () => {
+      const newName = subjectInput.value.trim();
+      if (!newName) {
+        subjectInput.value = subject.name;
+        return;
+      }
+      notebookConfigService.renameSubject(classroom, subject.id, newName);
+      workspaceService.save(classroom);
+    });
+
+    const removeSubjectButton = document.createElement('button');
+    removeSubjectButton.type = 'button';
+    removeSubjectButton.className = 'btn btn--text btn--danger-text';
+    removeSubjectButton.textContent = 'Remove Subject';
+    removeSubjectButton.addEventListener('click', () => {
+      const confirmed = window.confirm(
+        `Remove ${subject.name}? Its notebook types will be removed too.`
+      );
+      if (!confirmed) return;
+      notebookConfigService.removeSubject(classroom, subject.id);
+      workspaceService.save(classroom);
+      rerender();
+    });
+
+    subjectRow.append(subjectInput, removeSubjectButton);
+    subjectBlock.appendChild(subjectRow);
+
+    const typesList = document.createElement('ul');
+    typesList.className = 'settings-editable-list';
+    notebookConfigService.listNotebookTypes(classroom, subject.id).forEach((type) => {
+      const typeItem = document.createElement('li');
+      typeItem.className = 'settings-editable-list__item';
+
+      const typeInput = document.createElement('input');
+      typeInput.type = 'text';
+      typeInput.value = type.name;
+      typeInput.addEventListener('change', () => {
+        const newName = typeInput.value.trim();
+        if (!newName) {
+          typeInput.value = type.name;
+          return;
+        }
+        notebookConfigService.renameNotebookType(classroom, type.id, newName);
+        workspaceService.save(classroom);
+      });
+
+      const removeTypeButton = document.createElement('button');
+      removeTypeButton.type = 'button';
+      removeTypeButton.className = 'btn btn--text btn--danger-text';
+      removeTypeButton.textContent = 'Remove';
+      removeTypeButton.addEventListener('click', () => {
+        notebookConfigService.removeNotebookType(classroom, type.id);
+        workspaceService.save(classroom);
+        rerender();
+      });
+
+      typeItem.append(typeInput, removeTypeButton);
+      typesList.appendChild(typeItem);
+    });
+    subjectBlock.appendChild(typesList);
+
+    subjectBlock.appendChild(
+      createAddForm('New notebook type', 'Add type', (name) => {
+        notebookConfigService.addNotebookType(classroom, subject.id, name);
+        workspaceService.save(classroom);
+        rerender();
+      })
+    );
+
+    section.appendChild(subjectBlock);
+  });
+
+  section.appendChild(
+    createAddForm('New subject name', 'Add subject', (name) => {
+      notebookConfigService.addSubject(classroom, name);
+      workspaceService.save(classroom);
+      rerender();
+    })
+  );
 
   content.appendChild(section);
 }

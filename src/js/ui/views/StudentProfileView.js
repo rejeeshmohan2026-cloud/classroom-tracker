@@ -23,6 +23,12 @@ import * as badgeService from '../../services/badgeService.js';
 import * as noteService from '../../services/noteService.js';
 import * as timelineService from '../../services/timelineService.js';
 import * as learningActivityService from '../../services/learningActivityService.js';
+import * as notebookConfigService from '../../services/notebookConfigService.js';
+import * as notebookService from '../../services/notebookService.js';
+import * as studentProgressService from '../../services/studentProgressService.js';
+import { createNotebookTimelineElement } from '../components/NotebookTimeline.js';
+import { NOTEBOOK_TIMELINE_SYMBOLS, NOTEBOOK_TIMELINE_STATUS_LABELS, deriveDaySymbolKey } from '../../config/notebookStatuses.js';
+import { getCurrentYearMonth, getDaysInYearMonth, formatDateKey } from '../../utils/dateHelpers.js';
 import { BUCKET_KEYS, BUCKET_LABELS, getBucketLabel, getBucketRowStyle } from '../../config/bucketConfig.js';
 import { getGroupColorHex } from '../../config/groupColorConfig.js';
 import { formatDate } from '../../utils/dateHelpers.js';
@@ -31,11 +37,12 @@ import { openAwardBadgeModal } from '../components/AwardBadgeModal.js';
 import { openAddNoteModal } from '../components/AddNoteModal.js';
 import { openLogParticipationModal } from '../components/LogParticipationModal.js';
 
-const TABS = ['overview', 'achievements', 'learning', 'activity', 'notes'];
+const TABS = ['overview', 'achievements', 'learning', 'notebooks', 'activity', 'notes'];
 const TAB_LABELS = {
   overview: 'Overview',
   achievements: 'Achievements',
   learning: 'Learning',
+  notebooks: 'Notebooks',
   activity: 'Activity',
   notes: 'Notes',
 };
@@ -66,6 +73,7 @@ export function renderStudentProfileView(container, { classroom, studentId, tab,
     overview: renderOverviewTab,
     achievements: renderAchievementsTab,
     learning: renderLearningTab,
+    notebooks: renderNotebooksTab,
     activity: renderActivityTab,
     notes: renderNotesTab,
   };
@@ -418,6 +426,84 @@ function renderLearningTab(content, classroom, student) {
   });
 
   section.appendChild(list);
+  content.appendChild(section);
+}
+
+// ---------------------------------------------------------------------
+// Notebooks
+// ---------------------------------------------------------------------
+
+function renderNotebooksTab(content, classroom, student) {
+  const section = document.createElement('div');
+  section.className = 'profile-section';
+
+  const heading = document.createElement('h2');
+  heading.className = 'profile-section__heading';
+  heading.textContent = 'Notebooks';
+  section.appendChild(heading);
+
+  const subjects = notebookConfigService.listSubjects(classroom);
+  const notebookTypePairs = [];
+  subjects.forEach((subject) => {
+    notebookConfigService.listNotebookTypes(classroom, subject.id).forEach((notebookType) => {
+      notebookTypePairs.push({ subject, notebookType });
+    });
+  });
+
+  if (notebookTypePairs.length === 0) {
+    section.appendChild(
+      createEmptyStateElement({
+        message: 'No notebooks configured yet for this classroom.',
+      })
+    );
+    content.appendChild(section);
+    return;
+  }
+
+  const yearMonth = getCurrentYearMonth();
+  const daysInMonth = getDaysInYearMonth(yearMonth);
+
+  notebookTypePairs.forEach(({ subject, notebookType }) => {
+    const history = notebookService.getStudentHistory(classroom, subject.id, notebookType.id, student.id);
+    if (history.length === 0) return; // nothing recorded for this notebook yet — skip rather than show an empty block
+
+    const block = document.createElement('div');
+    block.className = 'settings-team-block';
+
+    const blockHeading = document.createElement('h3');
+    blockHeading.className = 'settings-team-block__heading';
+    blockHeading.textContent = `${subject.name} \u00b7 ${notebookType.name}`;
+    block.appendChild(blockHeading);
+
+    const days = [];
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = `${yearMonth}-${String(day).padStart(2, '0')}`;
+      const entry = notebookService.getEntry(classroom, subject.id, notebookType.id, dateKey, student.id);
+      const symbolKey = deriveDaySymbolKey(entry);
+      days.push({
+        dateKey,
+        symbol: NOTEBOOK_TIMELINE_SYMBOLS[symbolKey],
+        statusLabel: NOTEBOOK_TIMELINE_STATUS_LABELS[symbolKey],
+      });
+    }
+    block.appendChild(createNotebookTimelineElement({ days }));
+
+    const statsRow = document.createElement('div');
+    statsRow.className = 'profile-overview';
+    const completionPercent = studentProgressService.getCompletionPercent(classroom, subject.id, notebookType.id, student.id);
+    const currentStreak = studentProgressService.getCurrentStreak(classroom, subject.id, notebookType.id, student.id);
+    const bestStreak = studentProgressService.getBestStreak(classroom, subject.id, notebookType.id, student.id);
+    const lastChecked = studentProgressService.getLastChecked(classroom, subject.id, notebookType.id, student.id);
+
+    statsRow.appendChild(createStatCard('\ud83d\udcd2 Completion', `${completionPercent}%`));
+    statsRow.appendChild(createStatCard('\ud83d\udd25 Current Streak', currentStreak));
+    statsRow.appendChild(createStatCard('\ud83c\udfc6 Best Streak', bestStreak));
+    statsRow.appendChild(createStatCard('Last Checked', lastChecked ? formatDateKey(lastChecked) : '\u2014'));
+    block.appendChild(statsRow);
+
+    section.appendChild(block);
+  });
+
   content.appendChild(section);
 }
 

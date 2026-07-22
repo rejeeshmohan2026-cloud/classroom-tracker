@@ -2,22 +2,31 @@
  * config/memberRoles.js
  *
  * The roles a Classroom member can hold, and what each role is allowed
- * to do. Now backed by real Google-authenticated membership (see
- * services/memberService.js and models/Classroom.js's `members` map) —
- * previously this matrix existed but nothing checked it against an
- * actual signed-in identity.
+ * to do. Backed by real Google-authenticated membership for OWNER,
+ * TEACHER, and VIEWER (see services/memberService.js and
+ * models/Classroom.js's `members` map).
  *
- * Renamed ADMINISTRATOR -> OWNER (every classroom now has exactly one,
- * stamped at creation — see services/classroomService.js) and added
- * VIEWER, a read-only role for future use. Real invitations (owner
- * invites a teacher, who accepts) are a later phase; this matrix is
- * shaped so adding that doesn't require touching these definitions.
+ * STUDENT and PARENT are added here as provider-agnostic role
+ * *identifiers* only — reserving the vocabulary a future membership
+ * entry would use (`classroom.members[uid] = { role: 'student', ... }`,
+ * via the same memberService.addMember() teachers already use today),
+ * not an authentication mechanism. No code path currently assigns
+ * either role to a real uid, and neither has any permission yet: real
+ * enforcement is intentionally deferred until student/parent
+ * authentication is approved (see the Student Onboarding design
+ * discussion — blocked pending AI Working Committee review of Google
+ * Sign-In, profile photos, and DPDP Act children's-data handling for
+ * minors). When that's approved, plugging in a real identity means
+ * populating this same `members` map through the same addMember() call
+ * — no new membership mechanism to invent.
  */
 
 export const MEMBER_ROLES = Object.freeze({
   OWNER: 'owner',
   TEACHER: 'teacher',
   VIEWER: 'viewer',
+  STUDENT: 'student', // provider-agnostic placeholder — see file header
+  PARENT: 'parent', // provider-agnostic placeholder — see file header
 });
 
 export const PERMISSIONS = Object.freeze({
@@ -61,4 +70,9 @@ export const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.CREATE_LEARNING_ACTIVITY,
   ]),
   [MEMBER_ROLES.VIEWER]: Object.freeze([]),
+  // Both intentionally empty — see file header. Real permissions for
+  // these roles are a decision for when authentication is approved, not
+  // something to guess at now.
+  [MEMBER_ROLES.STUDENT]: Object.freeze([]),
+  [MEMBER_ROLES.PARENT]: Object.freeze([]),
 });

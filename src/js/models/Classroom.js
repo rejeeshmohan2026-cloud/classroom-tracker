@@ -40,6 +40,41 @@
  *   learningActivities - LearningActivity[] (see models/LearningActivity.js),
  *                    created once per classroom; each student then gets
  *                    a status against each one (see models/Student.js)
+ *   notebookConfig - { subjects: [{id, name}], notebookTypes: [{id,
+ *                    subjectId, name}] } — the classroom's configurable
+ *                    notebook taxonomy (see
+ *                    services/notebookConfigService.js). Kept separate
+ *                    from `notebooks` since this is near-static setup,
+ *                    edited from Settings, not accumulated day by day.
+ *   notebooks      - { [subjectId]: { [notebookTypeId]: { [dateKey]:
+ *                    { [studentId]: NotebookSubmission } } } } (see
+ *                    services/notebookService.js and
+ *                    models/NotebookSubmission.js) — Notebook Tracker's
+ *                    day-by-day register. No discrete "check" entity:
+ *                    a teacher opens a notebook, today's date is
+ *                    selected automatically, and marking a student
+ *                    writes directly under that date. Subject-first,
+ *                    matching how a teacher actually thinks about it
+ *                    ("English's Handwriting notebook, today").
+ *   notebookCheckTemplates, notebookChecks - LEGACY, pre-timeline
+ *                    shape. Left in place, unused, read only once by
+ *                    services/notebookService.js's one-time,
+ *                    non-destructive migration into `notebooks` (see
+ *                    that file) — never written to again.
+ *   classroomJoinCode - RESERVED, always null today. A future
+ *                    student/parent joining flow (Class Code or QR)
+ *                    would populate this and a not-yet-built
+ *                    membershipRequestService would redeem it into a
+ *                    real `members` entry via memberService.addMember()
+ *                    — the same function teachers are added through
+ *                    today. No generator, no redemption logic, and no UI
+ *                    exist yet; this field exists purely so that future
+ *                    work is additive (fill in a value and wire up a
+ *                    service) rather than a schema change. See
+ *                    config/memberRoles.js's STUDENT/PARENT roles for
+ *                    the matching placeholder on the membership side —
+ *                    both are blocked pending the same authentication
+ *                    approval.
  *   settings       - classroom-level settings: bucket scoring, point
  *                    scoring, badge catalog, and Setup Wizard progress —
  *                    see config/classroomDefaults.js for the defaults,
@@ -64,6 +99,11 @@ export function createClassroom({
   memberUids = [],
   teams = [],
   learningActivities = [],
+  notebookConfig = { subjects: [], notebookTypes: [] },
+  notebooks = {},
+  notebookCheckTemplates = {},
+  notebookChecks = {},
+  classroomJoinCode = null,
   settings = buildDefaultSettings(),
 } = {}) {
   return {
@@ -79,6 +119,11 @@ export function createClassroom({
     memberUids,
     teams,
     learningActivities,
+    notebookConfig,
+    notebooks,
+    notebookCheckTemplates,
+    notebookChecks,
+    classroomJoinCode,
     settings,
   };
 }

@@ -66,4 +66,23 @@ export class ClassroomRepository {
   async deleteLegacyClassroom(uid, classroomId) {
     throw new Error('ClassroomRepository.deleteLegacyClassroom() must be implemented by a subclass');
   }
+
+  /**
+   * Continue Working (see services/continueWorkingService.js): records
+   * that this uid just opened a notebook, keeping only their most recent
+   * few. Deliberately scoped to the teacher's own `users/{uid}` document
+   * — never the classroom — since "recently opened" is personal, not
+   * something every teacher on a shared classroom should see reflected
+   * back at them from someone else's activity.
+   */
+  // eslint-disable-next-line no-unused-vars
+  async recordRecentNotebook(uid, entry) {
+    throw new Error('ClassroomRepository.recordRecentNotebook() must be implemented by a subclass');
+  }
+
+  /** Subscribes to this uid's recently-opened-notebooks list. Returns an unsubscribe function. */
+  // eslint-disable-next-line no-unused-vars
+  subscribeToRecentNotebooks(uid, onChange, onError) {
+    throw new Error('ClassroomRepository.subscribeToRecentNotebooks() must be implemented by a subclass');
+  }
 }
