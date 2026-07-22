@@ -29,7 +29,6 @@
  * data-handling rules.
  */
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import {
   getAuth,
   GoogleAuthProvider,
@@ -39,19 +38,20 @@ import {
   setPersistence,
   browserLocalPersistence,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { firebaseConfig } from '../config/firebaseConfig.js';
+import { getFirebaseApp } from './firebaseApp.js';
 
-let app = null;
 let auth = null;
 
 /**
- * Initialises Firebase and sets session persistence to local storage
- * (survives closing the browser entirely, not just a page refresh).
- * Safe to call more than once — only the first call does anything.
+ * Initialises Firebase Auth (against the shared app from
+ * services/firebaseApp.js) and sets session persistence to local
+ * storage (survives closing the browser entirely, not just a page
+ * refresh). Safe to call more than once — only the first call does
+ * anything.
  */
 export function initAuth() {
-  if (app) return;
-  app = initializeApp(firebaseConfig);
+  if (auth) return;
+  const app = getFirebaseApp();
   auth = getAuth(app);
   setPersistence(auth, browserLocalPersistence).catch((error) => {
     console.error('[authService] Failed to set auth persistence:', error);
@@ -67,6 +67,16 @@ export function initAuth() {
  */
 export function onAuthStateChange(callback) {
   return onAuthStateChanged(auth, (firebaseUser) => {
+    if (firebaseUser) {
+      // TEMPORARY DEBUG LOGGING — remove after cross-device investigation.
+      // Deliberately logs UID only, not EMAIL: this app's design (see the
+      // module doc comment above) never reads/stores/logs the teacher's
+      // email, and console output here is likely to be copy-pasted
+      // elsewhere while debugging. UID alone is enough to confirm/rule
+      // out "different account signed in on this device."
+      console.log('[AUTH]');
+      console.log('UID:', firebaseUser.uid);
+    }
     callback(firebaseUser ? toSafeProfile(firebaseUser) : null);
   });
 }

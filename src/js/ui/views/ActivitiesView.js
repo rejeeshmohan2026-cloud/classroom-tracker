@@ -137,7 +137,7 @@ function renderNewActivityForm(classroom, rerender) {
       type: typeSelect.value,
       dueDate: dueDateInput.value,
     });
-    workspaceService.save();
+    workspaceService.save(classroom);
     rerender();
   });
   form.appendChild(createButton);
@@ -233,7 +233,7 @@ function createRosterRow(classroom, student, team, activity) {
       feedback: feedbackInput.value.trim(),
       score: scoreInput.value === '' ? null : Number(scoreInput.value),
     });
-    workspaceService.save();
+    workspaceService.save(classroom);
   });
 
   row.append(nameEl, statusSelect, feedbackInput, scoreInput, saveButton);

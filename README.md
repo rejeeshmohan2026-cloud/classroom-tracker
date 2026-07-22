@@ -133,20 +133,32 @@ git clone <repository-url>
 cd classroom-tracker
 ```
 
-### 2. Set up Firebase Authentication
+### 2. Set up Firebase (Authentication + Firestore)
 
-The app won't sign anyone in until this is done — see
-[`src/js/config/firebaseConfig.js`](src/js/config/firebaseConfig.js) for
-the full checklist:
+The app won't sign anyone in or load any classrooms until this is done.
+`src/js/config/firebaseConfig.js` holds your **real** Firebase
+credentials — it's gitignored and is never committed, regenerated, or
+included in any generated project archive, the same way you'd treat a
+`.env` file. See
+[`src/js/config/firebaseConfig.example.js`](src/js/config/firebaseConfig.example.js)
+for the full checklist and every field's placeholder:
 
-1. Create (or open) a project at the
+1. Copy `firebaseConfig.example.js` to `firebaseConfig.js` in the same
+   folder.
+2. Create (or open) a project at the
    [Firebase console](https://console.firebase.google.com).
-2. Project Settings → General → "Your apps" → add a Web app, and copy
-   its config object into `firebaseConfig.js`, replacing the
+3. Project Settings → General → "Your apps" → add a Web app, and copy
+   its config object into your new `firebaseConfig.js`, replacing the
    placeholders.
-3. Authentication → Sign-in method → enable **Google**.
-4. Authentication → Settings → Authorized domains → add whatever domain
+4. Authentication → Sign-in method → enable **Google**.
+5. Authentication → Settings → Authorized domains → add whatever domain
    you're serving the app from (`localhost` is included by default).
+6. Firestore Database → Create database (production mode is fine — the
+   security rules below handle access control).
+7. Firestore Database → Rules tab → paste the contents of
+   [`firestore.rules`](firestore.rules) → Publish. This restricts every
+   teacher to their own `teachers/{uid}/classrooms/` documents — see
+   that file's comments for what it enforces and why.
 
 ### 3. Serve the project locally
 

@@ -1,0 +1,42 @@
+// firestore.rules
+//
+// Security rules for Classroom Tracker's Firestore database.
+//
+// How to apply these:
+//   Option A (Firebase Console): Firestore Database -> Rules tab ->
+//     paste this file's contents -> Publish.
+//   Option B (Firebase CLI): reference this file as "firestore.rules"
+//     in firebase.json, then run `firebase deploy --only firestore:rules`.
+//
+// What this enforces (matches Sprint 5's "Security" requirement):
+//   - A signed-in teacher can read/write ONLY documents under their own
+//     teachers/{uid}/classrooms/ subcollection — request.auth.uid must
+//     equal the {teacherId} segment of the path.
+//   - Nobody can read or write anything while signed out.
+//   - No shared/collaborative classrooms yet — this app doesn't create
+//     any document outside a single teacher's own subcollection, and
+//     these rules don't allow cross-teacher access even if it tried to.
+//
+// This is intentionally narrow. When multi-teacher shared classrooms
+// are built (a future sprint, not this one), these rules will need a
+// members/roles check instead of a flat uid match — see
+// models/Member.js and config/memberRoles.js, which already model
+// administrator/teacher roles in the app's data even though nothing
+// enforces them here yet.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /teachers/{teacherId}/classrooms/{classroomId} {
+      allow read, write: if request.auth != null && request.auth.uid == teacherId;
+    }
+
+    // Everything else is denied by default (Firestore rules are
+    // deny-by-default outside of explicit `match` blocks), but this is
+    // here for clarity and as a deliberate backstop.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

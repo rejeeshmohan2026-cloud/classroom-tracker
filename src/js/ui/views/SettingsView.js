@@ -6,7 +6,7 @@
  * calls straight into the relevant service (teamService, studentService,
  * memberService, workspaceService) and re-renders itself afterwards —
  * there's no separate state layer here, the classroom object passed in is
- * mutated directly and workspaceService.save() persists it.
+ * mutated directly and workspaceService.save(classroom) persists it.
  *
  * Permissions is a static reference table only: there's no
  * authentication yet, so nothing here is actually enforced (see
@@ -273,7 +273,7 @@ function renderStudentsSection(content, classroom, rerender) {
           return;
         }
         studentService.renameStudent(team, student.id, newName);
-        workspaceService.save();
+        workspaceService.save(classroom);
       });
 
       const removeButton = document.createElement('button');
@@ -284,7 +284,7 @@ function renderStudentsSection(content, classroom, rerender) {
         const confirmed = window.confirm(`Remove ${student.name} from ${team.name}?`);
         if (!confirmed) return;
         studentService.removeStudent(team, student.id);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       });
 
@@ -296,7 +296,7 @@ function renderStudentsSection(content, classroom, rerender) {
     teamBlock.appendChild(
       createAddForm('New student name', 'Add student', (name) => {
         studentService.addStudent(team, name);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       })
     );
@@ -328,7 +328,7 @@ function renderGroupsSection(content, classroom, rerender) {
         return;
       }
       teamService.renameTeam(classroom, team.id, newName);
-      workspaceService.save();
+      workspaceService.save(classroom);
     });
 
     const removeButton = document.createElement('button');
@@ -341,7 +341,7 @@ function renderGroupsSection(content, classroom, rerender) {
       );
       if (!confirmed) return;
       teamService.removeTeam(classroom, team.id);
-      workspaceService.save();
+      workspaceService.save(classroom);
       rerender();
     });
 
@@ -353,7 +353,7 @@ function renderGroupsSection(content, classroom, rerender) {
   section.appendChild(
     createAddForm('New group name', 'Add group', (name) => {
       teamService.addTeam(classroom, name);
-      workspaceService.save();
+      workspaceService.save(classroom);
       rerender();
     })
   );
@@ -398,7 +398,7 @@ function renderTeachersSection(content, classroom, rerender) {
         );
         return;
       }
-      workspaceService.save();
+      workspaceService.save(classroom);
       rerender();
     });
 
@@ -431,7 +431,7 @@ function renderTeachersSection(content, classroom, rerender) {
     const name = nameInput.value.trim();
     if (!name) return;
     memberService.addMember(classroom, name, roleSelect.value);
-    workspaceService.save();
+    workspaceService.save(classroom);
     rerender();
   });
 

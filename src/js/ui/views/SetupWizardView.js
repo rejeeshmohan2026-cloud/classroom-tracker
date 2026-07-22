@@ -12,7 +12,7 @@
  *
  * Like ui/views/SettingsView.js, this file calls straight into services
  * and mutates the classroom object directly, persisting via
- * workspaceService.save() after each change.
+ * workspaceService.save(classroom) after each change.
  */
 
 import * as workspaceService from '../../services/workspaceService.js';
@@ -239,7 +239,7 @@ function renderImportStudentsStep(content, classroom, { advance }) {
           const { teams, buckets } = classroomImportService.parseWithFormat(formatId, analysis.rows);
           workspaceService.importRosterIntoClassroom(classroom.id, teams);
           setupProgressService.markStepDone(classroom, 'importStudents');
-          workspaceService.save();
+          workspaceService.save(classroom);
           if (buckets && Object.keys(buckets).length > 0) {
             pendingImportBucketsByClassroomId.set(classroom.id, buckets);
           }
@@ -294,7 +294,7 @@ function renderImportedBucketsPrompt(content, classroom, pendingBuckets, advance
   importButton.addEventListener('click', () => {
     bucketService.applyBucketsToClassroom(classroom, pendingBuckets);
     setupProgressService.markStepDone(classroom, 'assignBuckets');
-    workspaceService.save();
+    workspaceService.save(classroom);
     pendingImportBucketsByClassroomId.delete(classroom.id);
     advance();
   });
@@ -411,7 +411,7 @@ function renderManualBucketAssignment(content, classroom, advance) {
       bucketService.assignBucket(student, select.value || null);
     });
     setupProgressService.markStepDone(classroom, 'assignBuckets');
-    workspaceService.save();
+    workspaceService.save(classroom);
     advance();
   });
 
@@ -490,7 +490,7 @@ function renderCustomizeGroupsStep(content, classroom, { advance }) {
       teamService.updateTeamColor(classroom, team.id, getColor());
     });
     setupProgressService.markStepDone(classroom, 'customizeGroups');
-    workspaceService.save();
+    workspaceService.save(classroom);
     advance();
   });
 
@@ -552,7 +552,7 @@ function renderConfigureScoringStep(content, classroom, { advance }) {
       allowNegativePoints: negativeCheckbox.checked,
     });
     setupProgressService.markStepDone(classroom, 'configureScoring');
-    workspaceService.save();
+    workspaceService.save(classroom);
     advance();
   });
 

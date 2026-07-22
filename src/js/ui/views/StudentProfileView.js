@@ -11,7 +11,8 @@
  *
  * Like ui/views/SettingsView.js and ui/views/SetupWizardView.js, this
  * file calls straight into services and mutates the classroom/student
- * objects directly, persisting via workspaceService.save() after each
+ * objects directly, persisting via workspaceService.save(classroom) after
+ * each
  * change.
  */
 
@@ -188,7 +189,7 @@ function renderOverviewTab(content, classroom, student, team, rerender) {
 
   bucketSelect.addEventListener('change', () => {
     bucketService.assignBucket(student, bucketSelect.value || null);
-    workspaceService.save();
+    workspaceService.save(classroom);
     rerender();
   });
 
@@ -292,7 +293,7 @@ function renderAchievementsTab(content, classroom, student, team, rerender) {
       removeButton.setAttribute('aria-label', `Remove ${badgeName} badge`);
       removeButton.addEventListener('click', () => {
         badgeService.revokeBadge(student, badgeName);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       });
 
@@ -314,13 +315,13 @@ function renderAchievementsTab(content, classroom, student, team, rerender) {
       availableBadges,
       onAwardExisting: (badgeName) => {
         badgeService.awardBadge(student, badgeName);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       },
       onCreateAndAward: (badgeName) => {
         badgeService.addBadgeToCatalog(classroom, badgeName);
         badgeService.awardBadge(student, badgeName);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       },
     });
@@ -477,7 +478,7 @@ function renderActivityTab(content, classroom, student, team, rerender) {
     openLogParticipationModal({
       onSave: ({ delta, reason }) => {
         timelineService.logPoints(student, delta, reason);
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       },
     });
@@ -545,7 +546,7 @@ function renderNotesTab(content, classroom, student, team, rerender) {
     openAddNoteModal({
       onSave: ({ teacherName, content }) => {
         noteService.addNote(student, { teacherName, content });
-        workspaceService.save();
+        workspaceService.save(classroom);
         rerender();
       },
     });

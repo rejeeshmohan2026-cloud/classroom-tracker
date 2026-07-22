@@ -2,8 +2,14 @@
  * storage/localStorageAdapter.js
  *
  * A concrete storageAdapter.js implementation backed by the browser's
- * localStorage API — the default storage backend for this project.
- * Simple, offline-first, no external services or accounts required.
+ * localStorage API.
+ *
+ * As of Sprint 5, classroom data lives in Firestore (see
+ * repositories/firestoreClassroomRepository.js) — this adapter is now
+ * only used by services/workspaceService.js to (a) read any classrooms
+ * saved locally by an earlier version of this app, for one-time
+ * migration, and (b) store the small per-account "migration complete"
+ * flag. Nothing new is ever written here.
  */
 
 import { StorageAdapter } from './storageAdapter.js';

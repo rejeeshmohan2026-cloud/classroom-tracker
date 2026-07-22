@@ -78,7 +78,7 @@ export function renderTrackerView(container, props) {
   undoButton.addEventListener('click', () => {
     const undone = classModeService.undo(classroom);
     if (undone) {
-      workspaceService.save();
+      workspaceService.save(classroom);
       showToast('Last action undone');
       rerender();
     }
@@ -96,7 +96,7 @@ export function renderTrackerView(container, props) {
     if (!confirmed) return;
     studentService.resetAllScores(classroom);
     classModeService.clearUndoStack(classroom);
-    workspaceService.save();
+    workspaceService.save(classroom);
     showToast('Session reset');
     rerender();
   });
@@ -150,14 +150,14 @@ export function renderTrackerView(container, props) {
 
 function handleTap(classroom, team, student, rerender) {
   classModeService.awardStar(classroom, student);
-  workspaceService.save();
+  workspaceService.save(classroom);
   showToast(`+1 Star awarded to ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
 
 function handleSwipeLeft(classroom, team, student, rerender) {
   classModeService.deductPoint(classroom, student);
-  workspaceService.save();
+  workspaceService.save(classroom);
   showToast(`-1 Negative recorded for ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
@@ -174,7 +174,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
         onAwardExisting: (badgeName) => {
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            workspaceService.save();
+            workspaceService.save(classroom);
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }
@@ -183,7 +183,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
           badgeService.addBadgeToCatalog(classroom, badgeName);
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            workspaceService.save();
+            workspaceService.save(classroom);
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }
@@ -194,7 +194,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
       openAddNoteModal({
         onSave: ({ teacherName, content }) => {
           noteService.addNote(student, { teacherName, content });
-          workspaceService.save();
+          workspaceService.save(classroom);
           showToast('Note added');
           rerender();
         },
@@ -203,7 +203,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
     onChangeBucket: (bucketKey) => {
       const entry = classModeService.changeBucketQuick(classroom, student, bucketKey);
       if (entry) {
-        workspaceService.save();
+        workspaceService.save(classroom);
         showToast(`Bucket changed for ${student.name}`);
         rerender();
       }
