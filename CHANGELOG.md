@@ -260,3 +260,65 @@ Full Playwright pass confirmed: header renders both slots correctly on a brand-n
 - Perfect Attendance needs an attendance data source before it can move from placeholder to computed category.
 - Student/Parent onboarding remains blocked pending AI Working Committee review.
 - Visual/theme/animation polish — explicitly deferred.
+
+---
+
+## Phase 5 — Theme & Motion System
+
+**Scope:** a unified design-token system (color, spacing, radius, elevation, typography, font-weight, motion) and a small, purpose-first motion layer, applied across the existing UI. No new features — every stage was verified to change nothing functionally except where a fix was explicitly warranted (see the accessibility contrast fixes below). Implemented in the approved reorder: **1. Design tokens → 2. Theme migration → 3. Component cleanup → 4. Accessibility pass → 5. Motion rollout**, testing after each stage.
+
+### A correction made before Stage 1
+
+The original design proposal invented arbitrary hex values for Success (`#2f9e5b`) and a Recognition-specific accent (`#c8952a`). Before writing any tokens, the project's actual TFI brand guide (`tfi-brand` skill) was checked — it already documents **TFI Lime Green (`#B7C930`)** as the brand's "secondary accent" and **TFI Orange (`#FF9629`)** as "warm accent, highlights." Both were used instead of the invented values — Success = Lime Green, Accent = Orange (per the approved rename from a Recognition-specific token to a general one). Warning (TFI Yellow) and Danger (TFI Red-Orange) were already brand-correct and unchanged.
+
+### Features Added — Stage 1 (Design tokens)
+Purely additive; verified via screenshot comparison that nothing rendered differently. Added to `:root`: semantic color aliases (`--color-primary`, `--color-primary-strong`, `--color-success`, `--color-warning`, `--color-accent`), a 7-step spacing scale (`--space-1` … `--space-7`), a pill radius token, a 5-level elevation scale (`--elevation-flat` → `--elevation-card` → `--elevation-hover` → `--elevation-sheet` → `--elevation-dialog`), a typography scale (`--text-xs` … `--text-2xl`), font-weight tokens (`--font-weight-regular/medium/bold/black`), and motion tokens (`--duration-instant/fast/base/celebratory`, one shared `--ease-standard`).
+
+### Features Added — Stage 2 (Theme migration)
+Every component-level reference to `--color-cyan`/`--color-cyan-dark`/`--shadow-card` migrated to the new semantic names (`--color-primary`/`--color-primary-strong`/`--elevation-card`). Pure rename — verified the computed color still resolves to the exact original TFI Cyan value (`rgb(14, 192, 226)`) after migration.
+
+### Features Added — Stage 3 (Component cleanup)
+- Every `font-weight` numeric value tokenized (600/700/800 all had exact token matches — zero visual change).
+- Every hardcoded `border-radius: 999px` tokenized to `--radius-pill`.
+- Recognition Cards given a distinct visual identity: a 3px top border in the new Accent color (TFI Orange) — the one genuinely new visual element in this stage, scoped narrowly to where it was designed to matter.
+- The sixth and final button interaction state, **loading**, added (`[aria-busy="true"]`) — static appearance only at this stage (dimmed, a ring shown but not yet spinning), since the actual spin is motion and this stage was expressly the visual system, not motion.
+
+### Features Added — Stage 4 (Accessibility pass)
+- **A real WCAG AA contrast failure found and fixed**, not just documented: white text on TFI Cyan measures 2.17:1 — fails the 4.5:1 requirement for every text size in this app (none of the affected elements were large enough to qualify for the 3:1 "large text" exception, confirmed by checking each one's actual font-size). Fixed by changing text color to dark ink (8.0:1 contrast) everywhere this pairing occurred: the primary button (including "Start Class Mode," the single most-used button in the app), the Team Card header bar, the wizard checklist's done-icon, the user avatar's initial-letter fallback, active toggle-group buttons (Submission/Completion toggles, period tabs), the Notebook Register's "Today" badge, and the Recognition Screen's active category chip. **The brand color itself was never changed** — only the text color paired with it.
+- `:focus-visible` extended to Phase 2–4's newer interactive elements that had been relying on browser-default outlines: dashboard chips, pending-task links, the leaderboard's expand/collapse toggle, and recognition category chips.
+- The two separate, duplicated `@media (prefers-reduced-motion: reduce)` blocks identified in the original design review consolidated into one.
+- `--color-muted` on `--color-bg`/`--color-surface` was checked (6.03:1 / 6.43:1) and already passes comfortably — no change needed there.
+
+### Features Added — Stage 5 (Motion rollout)
+- Every remaining hardcoded transition/animation duration and easing (`0.1s`/`0.15s`/`0.2s`/`0.22s`/`0.35s`, all bare `ease`) tokenized onto the Stage 1 motion scale.
+- The button loading state's spinner animation completed (`@keyframes btn-spin`, 0.6s linear infinite — deliberately not one of the one-shot interaction durations, since a continuous loop needs different timing logic than a single state change).
+- **Recognition card entrance animation**: fade + small upward lift (`translateY(8px)` → `0`), using the celebratory *duration* but the same standard easing as everything else — no overshoot, no bounce, per the explicit refinement to keep Recognition "extremely subtle."
+- **Pending Task resolution**: success indication + height collapse, combined, as specified. A resolved item briefly reappears in lime-green with a checkmark, then collapses (max-height/opacity/padding all animating to zero) rather than vanishing abruptly. This required a small, explicitly-scoped exception to `PendingTasksWidget.js`'s otherwise-pure rendering: a module-level snapshot of the previous render's pending items, diffed against the current one purely to compute what just resolved — documented in-file as bookkeeping for one visual effect, not new application state.
+- Hover-lift extended to dashboard chips (Subjects, Groups, Continue Working) — subtle `translateY(-1px)` + `--elevation-hover`, matching the existing `.classroom-card` pattern, scoped to `:not(:disabled)` only (a disabled chip should never imply clickability).
+- "Motion communicates, never entertains" recorded directly in the stylesheet's motion-token comment block as the project's core motion principle, not just a design-conversation decision.
+
+### Files Modified
+- `src/css/styles.css` only — this entire phase was CSS plus one small, explicitly-scoped JS addition.
+- `src/js/ui/components/PendingTasksWidget.js` — added the previous-render snapshot/diff mechanism for the resolution animation (see Stage 5 above).
+
+### Breaking Changes
+None. Stages 1–2 were verified to produce zero visual difference. Stages 3–5's visual changes (Recognition accent border, contrast fixes, new animations) are all deliberate, specified improvements, not incidental side effects.
+
+### Regression Verification
+A full Playwright pass after every stage, not just at the end: Stage 1 (screenshot parity), Stage 2 (computed-color parity — confirmed `rgb(14, 192, 226)` unchanged), Stage 3 (Recognition accent border renders as TFI Orange), Stage 4 (all contrast fixes confirmed rendering as dark ink; full Settings/Notebook/Class Mode/Recognition regression with zero page errors), Stage 5 (the Pending Task resolution flow tested end-to-end — check a notebook, return to Dashboard, confirm the lime-green success item appears then collapses to `max-height: 0`, confirm Pending Tasks then shows "You're all caught up"; Recognition card confirmed carrying the `recognition-card-in` animation). A final full regression pass (Settings, Notebook Tracker, Register/Timeline Views, Class Mode, Recognition Screen with period switching) confirmed zero errors.
+
+### A mistake caught and fixed during implementation
+While consolidating the two duplicated reduced-motion blocks (Stage 4), the merge accidentally deleted an unrelated mobile-responsive rule (`.notebook-checking-row`/`.notebook-timeline-row` layout at `max-width: 480px`) that had been sitting between the two blocks being merged. Caught immediately by checking for the rule's continued existence after the edit (not just trusting the diff), and restored in the same step before moving on. Documented here rather than left unmentioned, consistent with how the Phase 1 Biggest Climber bug was handled.
+
+### Architectural Decisions Made During Implementation
+- **Only one easing curve exists in the whole app, including for Recognition** — per the explicit refinement rejecting overshoot/bounce for celebratory moments. Celebration is distinguished by a longer *duration* only, never a different curve.
+- **The elevation scale is five steps (Flat → Card → Hover → Sheet → Dialog), not the three originally proposed** — per the approved refinement, giving modals/sheets genuine visual separation from a merely-hovered card rather than sharing one shadow value across every "raised" element.
+- **Font-weight tokens were added even though no dark theme exists yet** — because they were free (exact value matches, zero visual risk) and directly serve "future components automatically inherit them," independent of any theme question.
+- **Icon system was explicitly out of scope**, per instruction — emoji stay as-is; a dedicated icon system is deferred to a future visual refresh, not bundled into this phase.
+- **The Pending Task resolution animation's stateful diff was kept as narrow as possible** — a plain snapshot comparison, not a general change-detection framework, and explicitly documented as bookkeeping for one visual effect rather than a precedent for giving other otherwise-pure widgets memory between renders.
+
+### Future TODOs
+- Consider extending the Recognition accent-border treatment to other celebratory moments if/when they're added (e.g. a future Wall of Fame), per the rationale for renaming the token from Recognition-specific to general Accent.
+- Dark theme remains a legitimate future option — this phase's semantic token layer is what makes it cheap to add later (swap token values only, touch no component CSS) — not scheduled now.
+- A full pixel-level spacing migration (snapping every remaining ad hoc `padding` value onto the `--space-*` scale) was intentionally scoped narrower this phase (font-weight and radius only, both exact-value migrations) — a good candidate for a future, low-risk follow-up pass.
+- (Carried over, unchanged from Phase 4's list): notebook quick-open, Recently Viewed Students, Student Dashboard preview, printable certificates, Teacher's Choice service, Perfect Attendance data source, Student/Parent onboarding.

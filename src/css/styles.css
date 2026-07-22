@@ -7,15 +7,100 @@
  */
 
 :root {
+  /* -------------------------------------------------------------
+   * Raw palette — unchanged values from before this phase. Every
+   * component should now reference the SEMANTIC layer below instead
+   * of these directly; kept here as the source those semantic tokens
+   * point to. TFI Lime Green and TFI Orange are added here because the
+   * brand guide already documents them for exactly the roles this
+   * phase needed (see the semantic layer's comments) — not invented.
+   * ------------------------------------------------------------- */
   --color-cyan: #0ec0e2;
   --color-cyan-dark: #0a94ae;
   --color-yellow: #ffd337;
   --color-danger: #e15344;
+  --color-lime: #b7c930;
+  --color-orange: #ff9629;
   --color-ink: #1a1a1a;
   --color-muted: #55606a;
   --color-bg: #f5f8fa;
   --color-surface: #ffffff;
   --color-border: #e2e8ed;
+
+  /* -------------------------------------------------------------
+   * Semantic colors — what a component should actually reference.
+   * ------------------------------------------------------------- */
+  --color-primary: var(--color-cyan);
+  --color-primary-strong: var(--color-cyan-dark);
+  --color-success: var(--color-lime); /* TFI Lime Green — brand's documented "secondary accent"; reads as complete/positive */
+  --color-warning: var(--color-yellow); /* TFI Yellow — unchanged, already this role today */
+  --color-accent: var(--color-orange); /* TFI Orange — brand's documented "warm accent, highlights"; used for celebratory/Recognition moments */
+
+  /* -------------------------------------------------------------
+   * Spacing scale — a 4px-based rhythm most of today's ad hoc padding
+   * values already approximate; Stage 3 migrates components onto it.
+   * ------------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* -------------------------------------------------------------
+   * Radius scale — --radius-card/--radius-control unchanged;
+   * --radius-pill formalizes what chips/badges already do ad hoc.
+   * ------------------------------------------------------------- */
+  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  /* -------------------------------------------------------------
+   * Elevation scale — Flat -> Card -> Hover -> Sheet -> Dialog.
+   * --shadow-card (below, unchanged) stays defined until Stage 3
+   * migrates its call sites onto --elevation-card (same value).
+   * ------------------------------------------------------------- */
+  --elevation-flat: none;
+  --elevation-card: 0 2px 10px rgba(15, 30, 40, 0.08);
+  --elevation-hover: 0 4px 16px rgba(15, 30, 40, 0.12);
+  --elevation-sheet: 0 8px 24px rgba(15, 30, 40, 0.16);
+  --elevation-dialog: 0 12px 40px rgba(15, 30, 40, 0.22);
+
+  /* -------------------------------------------------------------
+   * Typography scale + font-weight tokens.
+   * ------------------------------------------------------------- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.4rem;
+  --text-2xl: 1.75rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 800;
+
+  /* -------------------------------------------------------------
+   * Motion tokens. Core principle for this whole project, not just
+   * this file: MOTION COMMUNICATES, NEVER ENTERTAINS. Every duration/
+   * easing pair below exists because some interaction needs to say
+   * something (this is clickable, this just changed, this is worth a
+   * beat of attention) — never because it looks nice on its own.
+   *
+   * Only ONE easing curve exists, deliberately, including for
+   * Recognition: those moments stay a plain fade + small lift, never a
+   * bounce or overshoot, per an explicit product decision that
+   * celebration should still feel calm in a classroom used for hours
+   * every day — so there is no separate "celebratory easing," only a
+   * slightly longer celebratory *duration*.
+   * ------------------------------------------------------------- */
+  --duration-instant: 100ms; /* state toggles — button press, checkbox */
+  --duration-fast: 150ms; /* hover feedback */
+  --duration-base: 200ms; /* most transitions — card hover, expand/collapse, resolution */
+  --duration-celebratory: 350ms; /* Recognition and star-award moments only */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 
   --radius-card: 14px;
   --radius-control: 8px;
@@ -45,13 +130,13 @@ select {
 .btn {
   font-family: inherit;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.6rem 1.1rem;
   border-radius: var(--radius-control);
   border: 2px solid transparent;
   background-color: transparent;
   cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
 
 .btn:active {
@@ -64,19 +149,55 @@ select {
   transform: none;
 }
 
+/*
+ * Loading state — the sixth and last of this app's formalized button
+ * states (default, hover, pressed, focused, disabled, loading). Static
+ * for now, deliberately: this stage is visual-system cleanup, not
+ * motion — the ring below gets its actual spin animation in the Stage 5
+ * motion rollout, once the visual system underneath it is stable.
+ */
+.btn[aria-busy='true'] {
+  pointer-events: none;
+  color: transparent;
+  position: relative;
+}
+.btn[aria-busy='true']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border: 2px solid var(--color-surface);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+.btn--ghost[aria-busy='true']::after,
+.btn--text[aria-busy='true']::after {
+  border-color: var(--color-primary);
+  border-top-color: transparent;
+}
+
 .btn--primary {
-  background-color: var(--color-cyan);
-  border-color: var(--color-cyan);
-  color: var(--color-surface);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  /* Accessibility fix: white text on TFI Cyan measures 2.17:1 contrast —
+     fails WCAG AA's 4.5:1 requirement for this button's 15.2px bold text
+     (too small to qualify for the 3:1 "large text" exception). Dark ink
+     on the same cyan measures 8.0:1. The brand color itself is
+     unchanged; only the text color is corrected. */
+  color: var(--color-ink);
 }
 .btn--primary:hover:not(:disabled) {
-  background-color: var(--color-cyan-dark);
-  border-color: var(--color-cyan-dark);
+  background-color: var(--color-primary-strong);
+  border-color: var(--color-primary-strong);
 }
 
 .btn--ghost {
-  border-color: var(--color-cyan);
-  color: var(--color-cyan-dark);
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
 }
 .btn--ghost:hover:not(:disabled) {
   background-color: rgba(14, 192, 226, 0.1);
@@ -95,7 +216,7 @@ select {
   padding: 0.6rem 0.5rem;
 }
 .btn--text:hover:not(:disabled) {
-  color: var(--color-cyan-dark);
+  color: var(--color-primary-strong);
 }
 
 .btn--danger-text {
@@ -115,7 +236,11 @@ input:focus-visible,
 select:focus-visible,
 .student-row__surface:focus-visible,
 .student-row__more:focus-visible,
-.wizard-checklist__row:focus-visible {
+.wizard-checklist__row:focus-visible,
+.dashboard-widget__chip:focus-visible,
+.dashboard-widget__task-link:focus-visible,
+.leaderboard-list__toggle:focus-visible,
+.recognition-screen__category-chip:focus-visible {
   outline: 3px solid var(--color-yellow);
   outline-offset: 2px;
 }
@@ -137,7 +262,7 @@ select:focus-visible,
 
 .welcome-view__title {
   font-size: 1.75rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -167,7 +292,7 @@ select:focus-visible,
 
 .home-view__title {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -182,20 +307,20 @@ select:focus-visible,
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--elevation-card);
   padding: 1.25rem;
   cursor: pointer;
   font-family: inherit;
-  transition: transform 0.1s ease, border-color 0.15s ease;
+  transition: transform var(--duration-instant) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
 }
 .classroom-card:hover {
-  border-color: var(--color-cyan);
+  border-color: var(--color-primary);
   transform: translateY(-2px);
 }
 
 .classroom-card__name {
   font-size: 1.1rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0 0 0.25rem;
 }
 
@@ -227,7 +352,7 @@ select:focus-visible,
 .modal {
   background-color: var(--color-surface);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--elevation-card);
   padding: 1.75rem;
   width: 100%;
   max-width: 420px;
@@ -245,8 +370,8 @@ select:focus-visible,
 
 .import-preview__summary {
   margin: 0 0 1rem;
-  font-weight: 700;
-  color: var(--color-cyan-dark);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-strong);
 }
 
 .import-preview__team {
@@ -262,7 +387,7 @@ select:focus-visible,
 
 .import-preview__team-heading {
   font-size: 0.95rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0 0 0.35rem;
 }
 
@@ -276,19 +401,19 @@ select:focus-visible,
 .import-preview__error {
   margin: 0;
   color: var(--color-danger);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .modal__heading {
   margin: 0 0 1rem;
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
 }
 
 .modal__label {
   display: block;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   margin-bottom: 1rem;
 }
@@ -338,7 +463,7 @@ select:focus-visible,
 
 .tracker-header__title {
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -364,7 +489,7 @@ select:focus-visible,
 .team-card {
   background-color: var(--color-surface);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--elevation-card);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -376,22 +501,22 @@ select:focus-visible,
   justify-content: space-between;
   gap: 0.75rem;
   padding: 1rem 1.15rem;
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
+  background-color: var(--color-primary);
+  color: var(--color-ink);
 }
 
 .team-card__name {
   font-size: 1.1rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
 .team-card__total {
   font-size: 1.3rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   background-color: rgba(255, 255, 255, 0.22);
   padding: 0.25rem 0.75rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   min-width: 2.25rem;
   text-align: center;
 }
@@ -430,7 +555,7 @@ select:focus-visible,
   cursor: pointer;
   user-select: none;
   touch-action: pan-y;
-  transition: transform 0.15s ease;
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 .student-row__surface--dragging {
   transition: none;
@@ -459,12 +584,12 @@ select:focus-visible,
 }
 
 .student-row__name {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .student-row__points {
-  font-weight: 800;
-  color: var(--color-cyan-dark);
+  font-weight: var(--font-weight-black);
+  color: var(--color-primary-strong);
   min-width: 1.5rem;
   text-align: right;
 }
@@ -504,7 +629,7 @@ select:focus-visible,
 
 .settings-header__title {
   font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -518,7 +643,7 @@ select:focus-visible,
 .settings-tabs__tab {
   font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.55rem 0.9rem;
   border: none;
   border-bottom: 3px solid transparent;
@@ -528,7 +653,7 @@ select:focus-visible,
 }
 .settings-tabs__tab--active {
   color: var(--color-ink);
-  border-bottom-color: var(--color-cyan);
+  border-bottom-color: var(--color-primary);
 }
 
 .settings-content {
@@ -549,7 +674,7 @@ select:focus-visible,
 .settings-section__label {
   display: block;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   margin-bottom: 1rem;
 }
@@ -579,7 +704,7 @@ select:focus-visible,
 
 .settings-team-block__heading {
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0 0 0.6rem;
 }
 
@@ -607,7 +732,7 @@ select:focus-visible,
 
 .member-row__label {
   flex: 1;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .settings-add-form {
@@ -658,7 +783,7 @@ select:focus-visible,
 
 .wizard-overview__title {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0 0 0.5rem;
 }
 
@@ -673,22 +798,22 @@ select:focus-visible,
 
 .wizard-progress__track {
   height: 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-border);
   overflow: hidden;
 }
 
 .wizard-progress__fill {
   height: 100%;
-  background-color: var(--color-cyan);
-  border-radius: 999px;
-  transition: width 0.2s ease;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-pill);
+  transition: width var(--duration-base) var(--ease-standard);
 }
 
 .wizard-progress__label {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
 }
 
@@ -724,7 +849,7 @@ button.wizard-checklist__row {
   cursor: pointer;
 }
 button.wizard-checklist__row:hover {
-  border-color: var(--color-cyan);
+  border-color: var(--color-primary);
   background-color: rgba(14, 192, 226, 0.06);
 }
 
@@ -742,13 +867,13 @@ button.wizard-checklist__row:hover {
 }
 
 .wizard-checklist__icon--done {
-  border-color: var(--color-cyan);
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-ink);
 }
 
 .wizard-checklist__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .wizard-step-screen {
@@ -765,7 +890,7 @@ button.wizard-checklist__row:hover {
 
 .wizard-step-header__title {
   font-size: 1.2rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -789,7 +914,7 @@ button.wizard-checklist__row:hover {
 .wizard-field {
   display: block;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   margin-bottom: 1rem;
 }
@@ -821,11 +946,11 @@ button.wizard-checklist__row:hover {
   background-color: var(--color-yellow);
   color: var(--color-ink);
   font-size: 0.75rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   padding: 0.3rem 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   margin-bottom: 1rem;
 }
 
@@ -878,7 +1003,7 @@ button.wizard-checklist__row:hover {
 }
 
 .wizard-bucket-table__row--header {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   font-size: 0.85rem;
   text-transform: uppercase;
@@ -922,7 +1047,7 @@ button.wizard-checklist__row:hover {
 
 .profile-stat-card__label {
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -930,7 +1055,7 @@ button.wizard-checklist__row:hover {
 
 .profile-stat-card__value {
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
 }
 
 .profile-stat-card__select {
@@ -946,7 +1071,7 @@ button.wizard-checklist__row:hover {
 
 .profile-section__heading {
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0 0 0.75rem;
 }
 
@@ -998,7 +1123,7 @@ button.wizard-checklist__row:hover {
 }
 
 .timeline__label {
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .timeline__label--positive {
@@ -1028,7 +1153,7 @@ button.wizard-checklist__row:hover {
 
 .profile-header__name {
   font-size: 1.4rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -1056,7 +1181,7 @@ button.wizard-checklist__row:hover {
 
 .profile-header__chip-label {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   color: var(--color-muted);
@@ -1064,7 +1189,7 @@ button.wizard-checklist__row:hover {
 
 .profile-header__chip-value {
   font-size: 0.95rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
 }
 
 .profile-tabs {
@@ -1078,7 +1203,7 @@ button.wizard-checklist__row:hover {
 .profile-tabs__tab {
   font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.6rem 0.9rem;
   border: none;
   border-bottom: 3px solid transparent;
@@ -1088,7 +1213,7 @@ button.wizard-checklist__row:hover {
 }
 .profile-tabs__tab--active {
   color: var(--color-ink);
-  border-bottom-color: var(--color-cyan);
+  border-bottom-color: var(--color-primary);
 }
 
 .profile-tab-content {
@@ -1101,7 +1226,7 @@ button.wizard-checklist__row:hover {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .profile-group-card__swatch {
@@ -1139,7 +1264,7 @@ button.wizard-checklist__row:hover {
 }
 
 .achievement-card__label {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 0.85rem;
 }
 
@@ -1183,7 +1308,7 @@ button.wizard-checklist__row:hover {
 }
 
 .note-card__teacher {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .note-card__content {
@@ -1219,7 +1344,7 @@ button.wizard-checklist__row:hover {
   width: 100%;
 }
 .activity-list-card:hover {
-  border-color: var(--color-cyan);
+  border-color: var(--color-primary);
 }
 
 .activity-card__title-row {
@@ -1230,12 +1355,12 @@ button.wizard-checklist__row:hover {
 }
 
 .activity-card__title {
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
 }
 
 .activity-card__type {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
@@ -1245,9 +1370,9 @@ button.wizard-checklist__row:hover {
   display: inline-block;
   align-self: flex-start;
   font-size: 0.78rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.25rem 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: #eef1f4;
   color: var(--color-muted);
 }
@@ -1265,7 +1390,7 @@ button.wizard-checklist__row:hover {
 }
 .status-badge--resubmitted {
   background-color: #e2effb;
-  color: var(--color-cyan-dark);
+  color: var(--color-primary-strong);
 }
 
 .new-activity-form {
@@ -1304,7 +1429,7 @@ button.wizard-checklist__row:hover {
 .activity-roster-row__name {
   flex: 1;
   min-width: 160px;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .activity-roster-row__feedback {
@@ -1339,7 +1464,7 @@ button.wizard-checklist__row:hover {
 .modal__toggle {
   flex: 1;
   font-family: inherit;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.6rem;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -1348,8 +1473,8 @@ button.wizard-checklist__row:hover {
   color: var(--color-muted);
 }
 .modal__toggle--active {
-  border-color: var(--color-cyan);
-  color: var(--color-cyan-dark);
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
   background-color: rgba(14, 192, 226, 0.08);
 }
 
@@ -1378,14 +1503,14 @@ button.wizard-checklist__row:hover {
 .toast {
   background-color: var(--color-ink);
   color: var(--color-surface);
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   font-size: 0.9rem;
   padding: 0.65rem 1.1rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
 }
 .toast--visible {
   opacity: 1;
@@ -1402,7 +1527,7 @@ button.wizard-checklist__row:hover {
   align-items: flex-end;
   justify-content: center;
   z-index: 250;
-  transition: background-color 0.2s ease;
+  transition: background-color var(--duration-base) var(--ease-standard);
 }
 .sheet-overlay--visible {
   background-color: rgba(26, 26, 26, 0.45);
@@ -1415,7 +1540,7 @@ button.wizard-checklist__row:hover {
   border-radius: 20px 20px 0 0;
   padding: 0.75rem 1.25rem 1.5rem;
   transform: translateY(100%);
-  transition: transform 0.22s ease;
+  transition: transform var(--duration-base) var(--ease-standard);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
 }
 .bottom-sheet--visible {
@@ -1425,14 +1550,14 @@ button.wizard-checklist__row:hover {
 .bottom-sheet__handle {
   width: 36px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-color: var(--color-border);
   margin: 0 auto 0.85rem;
 }
 
 .bottom-sheet__name {
   font-size: 1.15rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
   text-align: center;
 }
@@ -1459,7 +1584,7 @@ button.wizard-checklist__row:hover {
   padding: 0.9rem 1rem;
   font-family: inherit;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   text-align: left;
   background-color: var(--color-bg);
   border: none;
@@ -1481,7 +1606,7 @@ button.wizard-checklist__row:hover {
   padding: 0.9rem 1rem;
   font-family: inherit;
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   background: none;
   border: none;
   color: var(--color-danger);
@@ -1505,7 +1630,18 @@ button.wizard-checklist__row:hover {
 
 .student-row__points--pulse,
 .team-card__total--pulse {
-  animation: score-pulse 0.35s ease;
+  animation: score-pulse var(--duration-celebratory) var(--ease-standard);
+}
+
+/* Loading spinner (see .btn[aria-busy='true'] above). Continuous loops
+   like this deliberately don't use one of the one-shot interaction
+   durations (100/150/200/350ms) — those exist to time a single state
+   change, not an infinite loop — 0.6s linear is simply a calm, legible
+   spin speed. */
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Login (Google Sign-In) */
@@ -1525,7 +1661,7 @@ button.wizard-checklist__row:hover {
 
 .login-view__title {
   font-size: 1.6rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   margin: 0;
 }
 
@@ -1548,8 +1684,8 @@ button.wizard-checklist__row:hover {
   height: 1.5rem;
   border-radius: 50%;
   background-color: var(--color-surface);
-  color: var(--color-cyan-dark);
-  font-weight: 800;
+  color: var(--color-primary-strong);
+  font-weight: var(--font-weight-black);
   font-size: 0.9rem;
 }
 
@@ -1584,15 +1720,15 @@ button.wizard-checklist__row:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
-  font-weight: 800;
+  background-color: var(--color-primary);
+  color: var(--color-ink);
+  font-weight: var(--font-weight-black);
   font-size: 0.85rem;
 }
 
 .user-bar__name {
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1603,7 +1739,7 @@ button.wizard-checklist__row:hover {
   flex-shrink: 0;
 }
 .user-bar .btn--text:hover {
-  color: var(--color-cyan);
+  color: var(--color-primary);
 }
 
 /* Notebook Tracker — Register View (fast entry) and Timeline View (read-only) */
@@ -1627,7 +1763,7 @@ button.wizard-checklist__row:hover {
 
 .notebook-checking-row__name {
   flex: 1 1 160px;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
   min-width: 140px;
 }
 
@@ -1640,22 +1776,22 @@ button.wizard-checklist__row:hover {
 .toggle-group__button {
   font-family: inherit;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   padding: 0.4rem 0.65rem;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-control);
   background: none;
   color: var(--color-muted);
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 .toggle-group__button:hover {
-  border-color: var(--color-cyan);
+  border-color: var(--color-primary);
 }
 .toggle-group__button--active {
-  border-color: var(--color-cyan);
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-ink);
 }
 
 .toggle-group__button:focus-visible {
@@ -1674,7 +1810,7 @@ button.wizard-checklist__row:hover {
 }
 
 .notebook-date-bar__label {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   min-width: 10rem;
   text-align: center;
 }
@@ -1683,11 +1819,11 @@ button.wizard-checklist__row:hover {
   display: inline-block;
   margin-left: 0.5rem;
   padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-primary);
+  color: var(--color-ink);
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
   text-transform: uppercase;
   letter-spacing: 0.02em;
   vertical-align: middle;
@@ -1709,7 +1845,7 @@ button.wizard-checklist__row:hover {
 
 .notebook-timeline-row__label {
   flex: 0 0 140px;
-  font-weight: 600;
+  font-weight: var(--font-weight-medium);
 }
 
 .notebook-timeline {
@@ -1734,28 +1870,18 @@ button.wizard-checklist__row:hover {
   letter-spacing: 0.02em;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .toggle-group__button {
-    transition: none;
-  }
-}
-
-@media (max-width: 480px) {
-  .notebook-checking-row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .notebook-timeline-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-}
-
-/* Accessibility & responsiveness */
-
+/* Reduced motion — one consolidated policy for the whole app (was
+   previously split across two separate, duplicated blocks). Every
+   transition/animation declared anywhere above is disabled here in one
+   place, rather than re-declaring `transition: none` per component
+   as new motion gets added — see Stage 5 (motion rollout) for the
+   token-driven motion this consolidation is set up to support. */
 @media (prefers-reduced-motion: reduce) {
   .btn,
-  .classroom-card {
+  .classroom-card,
+  .toggle-group__button,
+  .wizard-progress__fill,
+  .dashboard-widget__chip {
     transition: none;
   }
   .btn:active {
@@ -1774,6 +1900,15 @@ button.wizard-checklist__row:hover {
   .student-row__surface {
     transition: none;
   }
+  .btn[aria-busy='true']::after {
+    animation: none; /* falls back to the static ring — still communicates "loading", just without the spin */
+  }
+  .recognition-card {
+    animation: none;
+  }
+  .dashboard-widget__resolved-item {
+    transition: none;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1785,6 +1920,14 @@ button.wizard-checklist__row:hover {
   .settings-content,
   .home-view {
     padding: 1rem;
+  }
+  .notebook-checking-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .notebook-timeline-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
@@ -1836,12 +1979,19 @@ button.wizard-checklist__row:hover {
   font-size: 0.85rem;
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
-.dashboard-widget__chip:hover {
-  border-color: var(--color-cyan);
+.dashboard-widget__chip:disabled {
+  cursor: not-allowed;
+}
+.dashboard-widget__chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--elevation-hover);
 }
 
 .dashboard-widget__rank-list,
@@ -1868,7 +2018,7 @@ button.wizard-checklist__row:hover {
 .dashboard-section__heading {
   margin: 0;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-muted);
@@ -1889,9 +2039,30 @@ button.wizard-checklist__row:hover {
 .recognition-card {
   flex: 1 1 160px;
   border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
   border-radius: var(--radius-control);
   padding: 0.75rem;
   text-align: center;
+  animation: recognition-card-in var(--duration-celebratory) var(--ease-standard);
+}
+
+/*
+ * Fade + small upward lift only — deliberately no bounce or overshoot.
+ * This is the one animation in the app given a longer (celebratory)
+ * duration than everyday interaction feedback, but it uses the exact
+ * same easing curve as everything else. Motion communicates, never
+ * entertains: a Recognition win is still meant to feel calm in a
+ * classroom used for hours every day, not showy.
+ */
+@keyframes recognition-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .recognition-card--full {
@@ -1940,7 +2111,7 @@ button.wizard-checklist__row:hover {
   height: 2.2rem;
   border-radius: 50%;
   background-color: var(--color-bg);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 0.85rem;
 }
 
@@ -1951,7 +2122,7 @@ button.wizard-checklist__row:hover {
 }
 
 .recognition-card__winner-name {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   font-size: 0.9rem;
 }
 
@@ -1964,7 +2135,7 @@ button.wizard-checklist__row:hover {
 .recognition-card__stat {
   margin: 0.5rem 0;
   font-size: 1.4rem;
-  font-weight: 800;
+  font-weight: var(--font-weight-black);
 }
 
 .recognition-card__period {
@@ -1983,9 +2154,9 @@ button.wizard-checklist__row:hover {
 }
 
 .recognition-screen__category-chip--active {
-  border-color: var(--color-cyan);
-  background-color: var(--color-cyan);
-  color: var(--color-surface);
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-ink);
 }
 
 .recognition-screen__detail {
@@ -2015,7 +2186,7 @@ button.wizard-checklist__row:hover {
 }
 
 .leaderboard-list__rank {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   width: 2.5rem;
 }
 
@@ -2024,7 +2195,7 @@ button.wizard-checklist__row:hover {
 }
 
 .leaderboard-list__value {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .leaderboard-list__toggle {
@@ -2075,7 +2246,33 @@ button.wizard-checklist__row:hover {
   background: none;
   border: none;
   padding: 0;
-  color: var(--color-cyan);
+  color: var(--color-primary);
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* Pending Task resolution — success indication + height collapse
+   combined, so a task disappearing never causes an abrupt layout jump.
+   See ui/components/PendingTasksWidget.js for how "just resolved" is
+   detected. */
+.dashboard-widget__resolved-list {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+.dashboard-widget__resolved-item {
+  overflow: hidden;
+  max-height: 2rem;
+  opacity: 1;
+  padding: 0.25rem 0;
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
+  transition: max-height var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard),
+    padding var(--duration-base) var(--ease-standard);
+}
+.dashboard-widget__resolved-item--collapsing {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
