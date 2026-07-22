@@ -2,10 +2,16 @@
  * models/Classroom.js
  *
  * Describes the shape of a Classroom — the top-level entity a teacher
- * creates or imports.
+ * creates or imports. Now a *shared* entity: it lives at
+ * classrooms/{id} in Firestore (not nested under a single owner's uid),
+ * so any member listed in `members` can read and edit it, and every
+ * connected member's device sees changes in real time via the same
+ * document — never a per-teacher copy (see
+ * repositories/firestoreClassroomRepository.js and
+ * services/workspaceService.js).
  *
  * Fields:
- *   id             - unique identifier
+ *   id             - unique identifier, also the Firestore document id
  *   schoolName     - required, e.g. "CHS Kannamapet"
  *   gradeSection   - required, e.g. "Grade 8A", "Science Club"
  *   classroomName  - optional, a teacher-defined friendly name, e.g.
@@ -15,11 +21,21 @@
  *   academicYear   - optional, e.g. "2026–27"
  *   description    - optional free-text notes
  *   createdAt      - ISO date string
- *   administrators - Member[] (see models/Member.js) who can delete the
- *                    classroom, remove administrators, and transfer
- *                    ownership
- *   teachers       - Member[] who can award points, undo, reset, import
- *                    rosters, edit students/groups, and invite teachers
+ *   ownerUid       - the Firebase UID of the classroom's owner (set once,
+ *                    at creation; transferring ownership is a future
+ *                    feature — see config/memberRoles.js)
+ *   members        - { [uid]: { role, displayName, joinedAt } } — real,
+ *                    Google-authenticated membership (see
+ *                    services/memberService.js). displayName is stored
+ *                    here because this app has no way to look up another
+ *                    account's profile — only a signed-in user's own
+ *                    safe profile (uid/displayName) is ever available.
+ *   memberUids     - the same uids as `members`' keys, kept in sync, as
+ *                    a plain array. Firestore can't query "which
+ *                    documents have my uid as a map key", so this array
+ *                    exists purely so security rules and any future
+ *                    "classrooms I can access" query can use a simple,
+ *                    fast `uid in memberUids` check.
  *   teams          - Team[] (see models/Team.js)
  *   learningActivities - LearningActivity[] (see models/LearningActivity.js),
  *                    created once per classroom; each student then gets
@@ -43,8 +59,9 @@ export function createClassroom({
   academicYear = '',
   description = '',
   createdAt,
-  administrators = [],
-  teachers = [],
+  ownerUid = null,
+  members = {},
+  memberUids = [],
   teams = [],
   learningActivities = [],
   settings = buildDefaultSettings(),
@@ -57,8 +74,9 @@ export function createClassroom({
     academicYear,
     description,
     createdAt: createdAt || getCurrentIsoDate(),
-    administrators,
-    teachers,
+    ownerUid,
+    members,
+    memberUids,
     teams,
     learningActivities,
     settings,

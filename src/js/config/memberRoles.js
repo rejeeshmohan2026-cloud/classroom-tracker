@@ -1,20 +1,23 @@
 /**
  * config/memberRoles.js
  *
- * The roles a Classroom member can hold, and what each role is allowed to
- * do. This is a data-only permission matrix — no authentication exists
- * yet, so nothing in the app currently checks "the logged-in user's
- * role" against it. It exists now so that:
- *   (a) services/permissionService.js has a single source of truth to
- *       read from once a "current user" concept exists (Firebase auth),
- *       and
- *   (b) the Settings > Permissions screen has real data to display as a
- *       reference for teachers today.
+ * The roles a Classroom member can hold, and what each role is allowed
+ * to do. Now backed by real Google-authenticated membership (see
+ * services/memberService.js and models/Classroom.js's `members` map) —
+ * previously this matrix existed but nothing checked it against an
+ * actual signed-in identity.
+ *
+ * Renamed ADMINISTRATOR -> OWNER (every classroom now has exactly one,
+ * stamped at creation — see services/classroomService.js) and added
+ * VIEWER, a read-only role for future use. Real invitations (owner
+ * invites a teacher, who accepts) are a later phase; this matrix is
+ * shaped so adding that doesn't require touching these definitions.
  */
 
 export const MEMBER_ROLES = Object.freeze({
-  ADMINISTRATOR: 'administrator',
+  OWNER: 'owner',
   TEACHER: 'teacher',
+  VIEWER: 'viewer',
 });
 
 export const PERMISSIONS = Object.freeze({
@@ -24,25 +27,27 @@ export const PERMISSIONS = Object.freeze({
   IMPORT_ROSTER: 'import_roster',
   EDIT_STUDENTS: 'edit_students',
   EDIT_GROUPS: 'edit_groups',
+  MARK_ATTENDANCE: 'mark_attendance', // future — attendance isn't built yet
+  CREATE_LEARNING_ACTIVITY: 'create_learning_activity',
   INVITE_TEACHER: 'invite_teacher',
   REMOVE_TEACHER: 'remove_teacher',
-  REMOVE_ADMINISTRATOR: 'remove_administrator',
-  TRANSFER_ADMINISTRATOR: 'transfer_administrator',
+  TRANSFER_OWNERSHIP: 'transfer_ownership', // future
   DELETE_CLASSROOM: 'delete_classroom',
 });
 
 export const ROLE_PERMISSIONS = Object.freeze({
-  [MEMBER_ROLES.ADMINISTRATOR]: Object.freeze([
+  [MEMBER_ROLES.OWNER]: Object.freeze([
     PERMISSIONS.AWARD_POINTS,
     PERMISSIONS.UNDO,
     PERMISSIONS.RESET_SESSION,
     PERMISSIONS.IMPORT_ROSTER,
     PERMISSIONS.EDIT_STUDENTS,
     PERMISSIONS.EDIT_GROUPS,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.CREATE_LEARNING_ACTIVITY,
     PERMISSIONS.INVITE_TEACHER,
     PERMISSIONS.REMOVE_TEACHER,
-    PERMISSIONS.REMOVE_ADMINISTRATOR,
-    PERMISSIONS.TRANSFER_ADMINISTRATOR,
+    PERMISSIONS.TRANSFER_OWNERSHIP,
     PERMISSIONS.DELETE_CLASSROOM,
   ]),
   [MEMBER_ROLES.TEACHER]: Object.freeze([
@@ -52,6 +57,8 @@ export const ROLE_PERMISSIONS = Object.freeze({
     PERMISSIONS.IMPORT_ROSTER,
     PERMISSIONS.EDIT_STUDENTS,
     PERMISSIONS.EDIT_GROUPS,
-    PERMISSIONS.INVITE_TEACHER,
+    PERMISSIONS.MARK_ATTENDANCE,
+    PERMISSIONS.CREATE_LEARNING_ACTIVITY,
   ]),
+  [MEMBER_ROLES.VIEWER]: Object.freeze([]),
 });

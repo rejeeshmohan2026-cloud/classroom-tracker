@@ -1,55 +1,63 @@
 /**
  * services/memberService.js
  *
- * Operations on a Classroom's members — its `administrators` and
- * `teachers` lists (see models/Member.js and models/Classroom.js).
- * Name-only, no contact details: see models/Member.js for why, and
- * escalate to the AI Working Committee before adding any real invitation
- * mechanism that would need one.
+ * Operates on a Classroom's real, Google-authenticated membership —
+ * `members` (a map of uid -> {role, displayName, joinedAt}) and
+ * `memberUids` (a parallel array of the same keys; see
+ * models/Classroom.js for why both exist).
  *
- * No authentication exists yet, so nothing here checks "who is asking" —
- * see services/permissionService.js for the permission matrix these
- * rules are drawn from, ready to be enforced once a current-user concept
- * exists.
+ * This replaces the earlier name-only Member system from before real
+ * auth existed. Invitations (an owner invites a teacher by email, the
+ * teacher accepts) are a later phase — addMember() here is already
+ * exactly what accepting an invitation will call, so that phase is
+ * additive, not a rework of this file.
  */
 
-import { createMember } from '../models/Member.js';
 import { MEMBER_ROLES } from '../config/memberRoles.js';
 
-function listForRole(classroom, role) {
-  return role === MEMBER_ROLES.ADMINISTRATOR ? classroom.administrators : classroom.teachers;
+export function addMember(classroom, uid, role, displayName) {
+  if (!classroom.members) classroom.members = {};
+  if (!classroom.memberUids) classroom.memberUids = [];
+
+  classroom.members[uid] = {
+    role,
+    displayName: displayName || 'Teacher',
+    joinedAt: new Date().toISOString(),
+  };
+
+  if (!classroom.memberUids.includes(uid)) {
+    classroom.memberUids.push(uid);
+  }
+}
+
+/** Refuses to remove the owner — use a future transfer-ownership flow instead. */
+export function removeMember(classroom, uid) {
+  if (isOwner(classroom, uid)) return false;
+
+  const existed = Boolean(classroom.members?.[uid]);
+  if (classroom.members) delete classroom.members[uid];
+  if (classroom.memberUids) {
+    classroom.memberUids = classroom.memberUids.filter((memberUid) => memberUid !== uid);
+  }
+  return existed;
+}
+
+export function getRole(classroom, uid) {
+  return classroom.members?.[uid]?.role || null;
+}
+
+export function isOwner(classroom, uid) {
+  return getRole(classroom, uid) === MEMBER_ROLES.OWNER;
 }
 
 export function listMembers(classroom) {
-  return [
-    ...classroom.administrators.map((member) => ({ ...member, role: MEMBER_ROLES.ADMINISTRATOR })),
-    ...classroom.teachers.map((member) => ({ ...member, role: MEMBER_ROLES.TEACHER })),
-  ];
+  return Object.entries(classroom.members || {}).map(([uid, info]) => ({ uid, ...info }));
 }
 
-export function addMember(classroom, name, role) {
-  const member = createMember({ name, role });
-  listForRole(classroom, role).push(member);
-  return member;
+export function getOwner(classroom) {
+  return listMembers(classroom).find((member) => member.role === MEMBER_ROLES.OWNER) || null;
 }
 
-/**
- * Removes a member. Refuses to remove the classroom's last administrator
- * — every classroom must keep at least one — and returns false in that
- * case rather than throwing, so the UI can show a plain message.
- */
-export function removeMember(classroom, memberId) {
-  const isLastAdministrator =
-    classroom.administrators.length === 1 &&
-    classroom.administrators[0].id === memberId;
-
-  if (isLastAdministrator) return false;
-
-  const beforeAdmins = classroom.administrators.length;
-  classroom.administrators = classroom.administrators.filter((m) => m.id !== memberId);
-  if (classroom.administrators.length < beforeAdmins) return true;
-
-  const beforeTeachers = classroom.teachers.length;
-  classroom.teachers = classroom.teachers.filter((m) => m.id !== memberId);
-  return classroom.teachers.length < beforeTeachers;
+export function listTeachers(classroom) {
+  return listMembers(classroom).filter((member) => member.role !== MEMBER_ROLES.OWNER);
 }

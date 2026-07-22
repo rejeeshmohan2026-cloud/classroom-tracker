@@ -1,113 +1,172 @@
 /**
  * services/workspaceService.js
  *
- * Orchestrates the Workspace: loading a teacher's classrooms from
- * Firestore in real time, creating/updating/deleting them, and
- * migrating any pre-Firestore local data exactly once. This is the
+ * Orchestrates the Workspace: loading every classroom a teacher belongs
+ * to from Firestore in real time, creating/updating/deleting them, and
+ * migrating existing data forward exactly once per account. This is the
  * module the UI/router layer talks to for anything workspace- or
  * classroom-level — it never touches Firestore directly, only the
- * repository contract (see repositories/classroomRepository.js), so a
- * future storage provider could be swapped in here without any UI
- * change.
+ * repository contract (see repositories/classroomRepository.js).
  *
  * Architecture: UI -> workspaceService (here) -> repository -> Firestore.
  *
- * classroomService's in-memory array remains the single source of truth
- * for rendering (unchanged from earlier sprints) — this file's job is
- * keeping that array in sync with Firestore and writing back to it:
- *   - subscribeToClassrooms() keeps it live-updated from Firestore
- *     (including changes made on another signed-in device);
- *   - every mutation below (createClassroom, deleteClassroom, save)
- *     updates the in-memory copy immediately for an instant-feeling UI,
- *     then fires an async, incremental write for just the one
- *     classroom that changed — never the whole workspace — and doesn't
- *     block the UI on that write completing.
+ * SHARED CLASSROOMS (this phase): a teacher's classrooms are no longer
+ * "their own collection" — each classroom is one shared document any
+ * member can read/write, and a teacher's *list* of accessible classrooms
+ * is a separate pointer collection (users/{uid}/classroomRefs). So this
+ * file now runs a "listener of listeners":
+ *   1. One live listener on the teacher's classroomRefs (which
+ *      classrooms am I a member of right now?).
+ *   2. As that list changes, open or close one live listener per
+ *      classroom document referenced — never more than the teacher
+ *      actually belongs to, never a duplicate of the same document.
+ * Every mutation still updates the in-memory copy immediately (instant
+ * UI), then fires an async, incremental write for just the one
+ * classroom that changed.
  */
 
-import { LEGACY_STORAGE_KEY, migrationFlagKey } from '../config/appConfig.js';
+import { LEGACY_STORAGE_KEY } from '../config/appConfig.js';
 import { localStorageAdapter } from '../storage/localStorageAdapter.js';
 import { firestoreClassroomRepository as repository } from '../repositories/firestoreClassroomRepository.js';
 import * as classroomService from './classroomService.js';
+import * as memberService from './memberService.js';
+import { MEMBER_ROLES } from '../config/memberRoles.js';
 
-let currentUid = null;
-let unsubscribeSnapshot = null;
 let onChangeCallback = null;
+let unsubscribeRefs = null;
+const classroomSubscriptions = new Map(); // classroomId -> unsubscribe fn
 
-async function migrateLocalDataIfNeeded(uid) {
-  const flagKey = migrationFlagKey(uid);
-  if (localStorageAdapter.get(flagKey)) return;
+/**
+ * Migrates any classroom that isn't in the shared model yet to
+ * classrooms/{id} + a classroomRefs pointer, adding ownership/membership
+ * fields but changing nothing else about the classroom's content.
+ * Covers whichever earlier location this teacher's data might still be
+ * sitting in:
+ *   - Sprint 5's per-owner cloud location (teachers/{uid}/classrooms),
+ *     checked first; or, only if that's empty,
+ *   - this device's pre-Sprint-5 local-only data (localStorage), for
+ *     anyone who somehow never opened the app between those updates.
+ * Guarded by a Firestore transaction (services/workspaceService.js's
+ * repository.claimMigration), not localStorage, so two devices signing
+ * in around the same time can't both run this and duplicate the upload.
+ */
+async function migrateToSharedClassroomsIfNeeded(uid, displayName) {
+  const claimed = await repository.claimMigration(uid);
+  if (!claimed) return; // already migrated (by this device or another)
 
-  const legacyData = localStorageAdapter.get(LEGACY_STORAGE_KEY);
-  const legacyClassrooms = Array.isArray(legacyData?.classrooms) ? legacyData.classrooms : [];
+  let legacyClassrooms = await repository.getLegacyClassroomsOnce(uid);
+  let cameFromLegacyCloud = legacyClassrooms.length > 0;
 
-  if (legacyClassrooms.length > 0) {
-    await Promise.all(legacyClassrooms.map((classroom) => repository.saveClassroom(uid, classroom)));
+  if (!cameFromLegacyCloud) {
+    const legacyLocalData = localStorageAdapter.get(LEGACY_STORAGE_KEY);
+    legacyClassrooms = Array.isArray(legacyLocalData?.classrooms) ? legacyLocalData.classrooms : [];
   }
 
-  // Mark migration complete even if there was nothing to migrate, so we
-  // never re-check the (now-irrelevant) local key again on this device.
-  localStorageAdapter.set(flagKey, true);
+  for (const legacyClassroom of legacyClassrooms) {
+    const migrated = { ...legacyClassroom };
+    delete migrated.administrators;
+    delete migrated.teachers;
+    migrated.ownerUid = uid;
+    migrated.members = {};
+    migrated.memberUids = [];
+    memberService.addMember(migrated, uid, MEMBER_ROLES.OWNER, displayName);
+
+    // eslint-disable-next-line no-await-in-loop
+    await repository.createClassroomWithOwner(migrated, uid);
+  }
+
+  if (cameFromLegacyCloud) {
+    // Clean up the legacy cloud location now that everything found
+    // there has a shared home. (Nothing to clean up if the data came
+    // from localStorage instead — that key is simply never read again,
+    // since this migration is now permanently marked complete for this
+    // account via the transaction above.)
+    await Promise.all(legacyClassrooms.map((classroom) => repository.deleteLegacyClassroom(uid, classroom.id)));
+  }
+}
+
+function subscribeToClassroom(classroomId) {
+  if (classroomSubscriptions.has(classroomId)) return;
+
+  const unsubscribe = repository.subscribeToClassroom(
+    classroomId,
+    (classroomData) => {
+      if (classroomData) {
+        classroomService.upsertClassroom(classroomData);
+      } else {
+        // The document is gone, or this teacher lost access to it.
+        classroomService.removeClassroomFromMemory(classroomId);
+      }
+      onChangeCallback?.();
+    },
+    (error) => {
+      console.error(`[workspaceService] Error listening to classroom ${classroomId}:`, error);
+    }
+  );
+
+  classroomSubscriptions.set(classroomId, unsubscribe);
+}
+
+function unsubscribeFromClassroom(classroomId) {
+  classroomSubscriptions.get(classroomId)?.();
+  classroomSubscriptions.delete(classroomId);
+  classroomService.removeClassroomFromMemory(classroomId);
+}
+
+function unsubscribeFromAllClassrooms() {
+  classroomSubscriptions.forEach((unsubscribe) => unsubscribe());
+  classroomSubscriptions.clear();
 }
 
 function persistClassroom(classroom) {
-  if (!currentUid || !classroom) return;
-  repository.saveClassroom(currentUid, classroom).catch((error) => {
+  if (!classroom) return;
+  repository.saveClassroom(classroom).catch((error) => {
     console.error('[workspaceService] Failed to save classroom:', error);
   });
 }
 
-function persistDelete(classroomId) {
-  if (!currentUid) return;
-  repository.deleteClassroom(currentUid, classroomId).catch((error) => {
-    console.error('[workspaceService] Failed to delete classroom:', error);
-  });
-}
-
 /**
- * Call once per sign-in. Migrates any legacy local data for this
- * teacher (once), then subscribes to their classrooms in real time.
- * `onChange` fires every time the in-memory classroom list changes —
- * from the live Firestore listener (e.g. an edit made on another
- * device) or immediately after a local write — so the caller can
- * re-render without the user ever needing to refresh manually.
+ * Call once per sign-in, with the teacher's uid and display name (their
+ * safe profile — see services/authService.js). Runs both migration
+ * stages (each a no-op after the first time), then subscribes to their
+ * classroomRefs, opening/closing one classroom listener per reference as
+ * that list changes. `onChange` fires every time anything in the
+ * in-memory classroom list changes — a ref appearing/disappearing, or
+ * any classroom document updating, from this device or another — so the
+ * caller can re-render without the user ever needing to refresh.
  */
-export async function initForUser(uid, onChange, onError) {
-  // TEMPORARY DEBUG LOGGING — remove after cross-device investigation.
-  console.log('[WORKSPACE]');
-  console.log('initForUser UID:', uid);
-
+export async function initForUser(uid, displayName, onChange, onError) {
   stopListening();
-  currentUid = uid;
   onChangeCallback = onChange;
 
-  await migrateLocalDataIfNeeded(uid);
+  await migrateToSharedClassroomsIfNeeded(uid, displayName);
 
-  unsubscribeSnapshot = repository.subscribeToClassrooms(
+  unsubscribeRefs = repository.subscribeToClassroomRefs(
     uid,
-    (classrooms) => {
-      classroomService.replaceClassrooms(classrooms);
-      // TEMPORARY DEBUG LOGGING — remove after cross-device investigation.
-      console.log('[WORKSPACE]');
-      console.log('Loaded classrooms:', classrooms.length);
-      console.log(classrooms.map((c) => c.id));
+    (refs) => {
+      const currentIds = new Set(refs.map((ref) => ref.classroomId));
+
+      for (const classroomId of Array.from(classroomSubscriptions.keys())) {
+        if (!currentIds.has(classroomId)) unsubscribeFromClassroom(classroomId);
+      }
+      currentIds.forEach((classroomId) => subscribeToClassroom(classroomId));
+
       onChangeCallback?.();
     },
     (error) => {
-      console.error('[workspaceService] Firestore subscription error:', error);
-      // Optional — added only so the temporary debug panel can surface
-      // this; existing callers that don't pass onError are unaffected.
+      console.error('[workspaceService] classroomRefs subscription error:', error);
       onError?.(error);
     }
   );
 }
 
-/** Call on sign-out. Stops listening and clears the in-memory workspace. */
+/** Call on sign-out. Stops every listener and clears the in-memory workspace. */
 export function stopListening() {
-  unsubscribeSnapshot?.();
-  unsubscribeSnapshot = null;
-  currentUid = null;
+  unsubscribeRefs?.();
+  unsubscribeRefs = null;
+  unsubscribeFromAllClassrooms();
   onChangeCallback = null;
-  classroomService.replaceClassrooms([]);
+  classroomService.clearAllClassrooms();
 }
 
 export function getState() {
@@ -118,9 +177,12 @@ export function getClassroomById(id) {
   return classroomService.getClassroomById(id);
 }
 
-export function createClassroom(details) {
-  const classroom = classroomService.createEmptyClassroom(details);
-  persistClassroom(classroom);
+/** `owner` is the creating teacher's safe profile: { uid, displayName }. */
+export function createClassroom(details, owner) {
+  const classroom = classroomService.createEmptyClassroom(details, owner);
+  repository.createClassroomWithOwner(classroom, owner.uid).catch((error) => {
+    console.error('[workspaceService] Failed to create classroom:', error);
+  });
   return classroom;
 }
 
@@ -139,8 +201,14 @@ export function updateClassroomDetails(id, updates) {
 }
 
 export function deleteClassroom(id) {
+  const classroom = classroomService.getClassroomById(id);
+  const memberUids = classroom?.memberUids || [];
   const deleted = classroomService.deleteClassroom(id);
-  if (deleted) persistDelete(id);
+  if (deleted) {
+    repository.deleteClassroom(id, memberUids).catch((error) => {
+      console.error('[workspaceService] Failed to delete classroom:', error);
+    });
+  }
   return deleted;
 }
 

@@ -8,9 +8,14 @@
  * there's no separate state layer here, the classroom object passed in is
  * mutated directly and workspaceService.save(classroom) persists it.
  *
- * Permissions is a static reference table only: there's no
- * authentication yet, so nothing here is actually enforced (see
- * services/permissionService.js).
+ * Real, Google-authenticated membership now exists (see
+ * services/memberService.js and models/Classroom.js's `members` map) —
+ * the Teachers tab shows the actual Owner and Teachers on this shared
+ * classroom, and "+ Invite Teacher" is a visible-to-owner-only
+ * placeholder for now (invitations are a later phase). Permissions is
+ * still a static reference table, but the role matrix it displays is now
+ * the real one enforced (client-side) elsewhere — e.g. Danger Zone below
+ * only lets the owner delete the classroom.
  */
 
 import * as teamService from '../../services/teamService.js';
@@ -31,12 +36,13 @@ const SECTION_LABELS = {
   danger: 'Danger Zone',
 };
 
-export function renderSettingsView(container, { classroom, section, onBack, onNavigateSection, onDeleted, onReopenSetupWizard }) {
+export function renderSettingsView(container, { classroom, currentUser, section, onBack, onNavigateSection, onDeleted, onReopenSetupWizard }) {
   container.innerHTML = '';
   const activeSection = SECTIONS.includes(section) ? section : 'general';
   const rerender = () =>
     renderSettingsView(container, {
       classroom,
+      currentUser,
       section: activeSection,
       onBack,
       onNavigateSection,
@@ -83,9 +89,9 @@ export function renderSettingsView(container, { classroom, section, onBack, onNa
     general: (el, cls, rr) => renderGeneralSection(el, cls, rr, onReopenSetupWizard),
     students: renderStudentsSection,
     groups: renderGroupsSection,
-    teachers: renderTeachersSection,
+    teachers: (el, cls, rr) => renderTeachersSection(el, cls, rr, currentUser),
     permissions: renderPermissionsSection,
-    danger: (el) => renderDangerSection(el, classroom, onDeleted),
+    danger: (el) => renderDangerSection(el, classroom, currentUser, onDeleted),
   };
   sectionRenderers[activeSection](content, classroom, rerender);
 
@@ -361,84 +367,82 @@ function renderGroupsSection(content, classroom, rerender) {
   content.appendChild(section);
 }
 
-function renderTeachersSection(content, classroom, rerender) {
+function renderTeachersSection(content, classroom, rerender, currentUser) {
   const section = document.createElement('div');
   section.className = 'settings-section';
 
-  const note = document.createElement('p');
-  note.className = 'settings-section__meta';
-  note.textContent =
-    'Members are added by name only — there is no login yet, so this list is for your own record-keeping.';
-  section.appendChild(note);
+  const isOwner = currentUser && memberService.isOwner(classroom, currentUser.uid);
 
-  const list = document.createElement('ul');
-  list.className = 'settings-editable-list';
+  const owner = memberService.getOwner(classroom);
+  const teachers = memberService.listTeachers(classroom);
 
-  memberService.listMembers(classroom).forEach((member) => {
-    const item = document.createElement('li');
-    item.className = 'settings-editable-list__item';
+  const ownerHeading = document.createElement('h3');
+  ownerHeading.className = 'settings-team-block__heading';
+  ownerHeading.textContent = 'Owner';
+  section.appendChild(ownerHeading);
 
-    const label = document.createElement('span');
-    label.className = 'member-row__label';
-    label.textContent = `${member.name} \u00b7 ${
-      member.role === MEMBER_ROLES.ADMINISTRATOR ? 'Administrator' : 'Teacher'
-    }`;
+  const ownerList = document.createElement('ul');
+  ownerList.className = 'settings-editable-list';
+  if (owner) {
+    ownerList.appendChild(createMemberRow(owner, currentUser));
+  }
+  section.appendChild(ownerList);
 
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.className = 'btn btn--text btn--danger-text';
-    removeButton.textContent = 'Remove';
-    removeButton.addEventListener('click', () => {
-      const confirmed = window.confirm(`Remove ${member.name}?`);
-      if (!confirmed) return;
-      const removed = memberService.removeMember(classroom, member.id);
-      if (!removed) {
-        window.alert(
-          'Every classroom needs at least one administrator — add another before removing this one.'
-        );
-        return;
-      }
-      workspaceService.save(classroom);
-      rerender();
+  const teachersHeading = document.createElement('h3');
+  teachersHeading.className = 'settings-team-block__heading';
+  teachersHeading.textContent = 'Teachers';
+  section.appendChild(teachersHeading);
+
+  if (teachers.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'settings-section__meta';
+    empty.textContent = 'No other teachers on this classroom yet.';
+    section.appendChild(empty);
+  } else {
+    const teachersList = document.createElement('ul');
+    teachersList.className = 'settings-editable-list';
+    teachers.forEach((member) => {
+      teachersList.appendChild(createMemberRow(member, currentUser));
     });
+    section.appendChild(teachersList);
+  }
 
-    item.append(label, removeButton);
-    list.appendChild(item);
-  });
+  // Invitations are a later phase — this is a visible-to-owner-only
+  // placeholder so the structure (and the button teachers will expect
+  // to find) is already in place.
+  if (isOwner) {
+    const inviteButton = document.createElement('button');
+    inviteButton.type = 'button';
+    inviteButton.className = 'btn btn--ghost';
+    inviteButton.textContent = '+ Invite Teacher';
+    inviteButton.disabled = true;
+    inviteButton.title = 'Coming soon';
+    inviteButton.addEventListener('click', () => {
+      window.alert('Inviting teachers is coming in a future update.');
+    });
+    section.appendChild(inviteButton);
 
-  section.appendChild(list);
-
-  const addForm = document.createElement('div');
-  addForm.className = 'settings-add-form';
-
-  const nameInput = document.createElement('input');
-  nameInput.type = 'text';
-  nameInput.placeholder = 'Name';
-
-  const roleSelect = document.createElement('select');
-  [MEMBER_ROLES.TEACHER, MEMBER_ROLES.ADMINISTRATOR].forEach((role) => {
-    const option = document.createElement('option');
-    option.value = role;
-    option.textContent = role === MEMBER_ROLES.ADMINISTRATOR ? 'Administrator' : 'Teacher';
-    roleSelect.appendChild(option);
-  });
-
-  const addButton = document.createElement('button');
-  addButton.type = 'button';
-  addButton.className = 'btn btn--ghost';
-  addButton.textContent = 'Add';
-  addButton.addEventListener('click', () => {
-    const name = nameInput.value.trim();
-    if (!name) return;
-    memberService.addMember(classroom, name, roleSelect.value);
-    workspaceService.save(classroom);
-    rerender();
-  });
-
-  addForm.append(nameInput, roleSelect, addButton);
-  section.appendChild(addForm);
+    const note = document.createElement('p');
+    note.className = 'settings-section__meta';
+    note.textContent = 'Invitations are coming soon \u2014 only you can see this button.';
+    section.appendChild(note);
+  }
 
   content.appendChild(section);
+}
+
+function createMemberRow(member, currentUser) {
+  const item = document.createElement('li');
+  item.className = 'settings-editable-list__item';
+
+  const label = document.createElement('span');
+  label.className = 'member-row__label';
+  const roleLabel = member.role === MEMBER_ROLES.OWNER ? 'Owner' : member.role === MEMBER_ROLES.VIEWER ? 'Viewer' : 'Teacher';
+  const youSuffix = currentUser && member.uid === currentUser.uid ? ' (you)' : '';
+  label.textContent = `${member.displayName}${youSuffix} \u00b7 ${roleLabel}`;
+
+  item.appendChild(label);
+  return item;
 }
 
 function renderPermissionsSection(content) {
@@ -448,14 +452,14 @@ function renderPermissionsSection(content) {
   const note = document.createElement('p');
   note.className = 'settings-section__meta';
   note.textContent =
-    'Reference only for now — there is no login yet, so none of this is enforced in the app.';
+    'Reference table. Some of this is enforced today (e.g. only the owner can delete this classroom); the rest is enforced by Firestore security rules and further UI gating as more features land.';
   section.appendChild(note);
 
   const table = document.createElement('table');
   table.className = 'permissions-table';
 
   const headRow = document.createElement('tr');
-  ['Permission', 'Administrator', 'Teacher'].forEach((label) => {
+  ['Permission', 'Owner', 'Teacher', 'Viewer'].forEach((label) => {
     const th = document.createElement('th');
     th.textContent = label;
     headRow.appendChild(th);
@@ -469,7 +473,7 @@ function renderPermissionsSection(content) {
     label.textContent = formatPermissionLabel(permission);
     row.appendChild(label);
 
-    [MEMBER_ROLES.ADMINISTRATOR, MEMBER_ROLES.TEACHER].forEach((role) => {
+    [MEMBER_ROLES.OWNER, MEMBER_ROLES.TEACHER, MEMBER_ROLES.VIEWER].forEach((role) => {
       const cell = document.createElement('td');
       cell.textContent = ROLE_PERMISSIONS[role].includes(permission) ? '\u2713' : '\u2014';
       cell.className = 'permissions-table__cell';
@@ -483,9 +487,20 @@ function renderPermissionsSection(content) {
   content.appendChild(section);
 }
 
-function renderDangerSection(content, classroom, onDeleted) {
+function renderDangerSection(content, classroom, currentUser, onDeleted) {
   const section = document.createElement('div');
   section.className = 'settings-section settings-section--danger';
+
+  const isOwner = currentUser && memberService.isOwner(classroom, currentUser.uid);
+
+  if (!isOwner) {
+    const notice = document.createElement('p');
+    notice.className = 'settings-section__meta';
+    notice.textContent = 'Only this classroom\u2019s owner can delete it.';
+    section.appendChild(notice);
+    content.appendChild(section);
+    return;
+  }
 
   const warning = document.createElement('p');
   warning.className = 'settings-section__meta';

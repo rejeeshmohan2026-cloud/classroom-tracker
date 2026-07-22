@@ -8,26 +8,67 @@
 //   Option B (Firebase CLI): reference this file as "firestore.rules"
 //     in firebase.json, then run `firebase deploy --only firestore:rules`.
 //
-// What this enforces (matches Sprint 5's "Security" requirement):
-//   - A signed-in teacher can read/write ONLY documents under their own
-//     teachers/{uid}/classrooms/ subcollection — request.auth.uid must
-//     equal the {teacherId} segment of the path.
-//   - Nobody can read or write anything while signed out.
-//   - No shared/collaborative classrooms yet — this app doesn't create
-//     any document outside a single teacher's own subcollection, and
-//     these rules don't allow cross-teacher access even if it tried to.
+// ---------------------------------------------------------------------
+// Real multi-teacher collaboration (this phase)
+// ---------------------------------------------------------------------
 //
-// This is intentionally narrow. When multi-teacher shared classrooms
-// are built (a future sprint, not this one), these rules will need a
-// members/roles check instead of a flat uid match — see
-// models/Member.js and config/memberRoles.js, which already model
-// administrator/teacher roles in the app's data even though nothing
-// enforces them here yet.
+// Classrooms are now shared documents at classrooms/{classroomId} —
+// any member listed in that document's `memberUids` array can read and
+// write it (see services/memberService.js for the roles: owner,
+// teacher, viewer). A teacher's list of accessible classrooms is a
+// separate pointer collection, users/{uid}/classroomRefs, which only
+// that uid can read or write.
+//
+// What this enforces:
+//   - Only a member of a classroom (their uid is in its `memberUids`
+//     array) can read or write it at all.
+//   - Only the classroom's stated owner (ownerUid) can create it in the
+//     first place, or delete it.
+//   - A teacher can only read/write their own classroomRefs and users
+//     documents (used for the one-time migration flag) — never anyone
+//     else's.
+//   - The old teachers/{uid}/classrooms/ location from before sharing
+//     existed is kept read/delete-able by its original owner ONLY —
+//     needed for the one-time migration in
+//     services/workspaceService.js, which reads then deletes from
+//     there. Nothing new is ever written to this location.
+//
+// KNOWN SIMPLIFICATION (see Phase 1 explanation in project history):
+// `update` here does not yet distinguish "teacher" from "viewer" — any
+// current member can write. A viewer being unable to write, and a
+// teacher being unable to edit `members`/`ownerUid`/`memberUids`
+// directly, are follow-up hardening for when the viewer role and
+// invitations actually ship, not implemented yet.
 
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /classrooms/{classroomId} {
+      allow read: if request.auth != null &&
+        request.auth.uid in resource.data.memberUids;
+
+      allow create: if request.auth != null &&
+        request.auth.uid == request.resource.data.ownerUid &&
+        request.auth.uid in request.resource.data.memberUids;
+
+      allow update: if request.auth != null &&
+        request.auth.uid in resource.data.memberUids;
+
+      allow delete: if request.auth != null &&
+        request.auth.uid == resource.data.ownerUid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+
+      match /classroomRefs/{classroomId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Legacy, pre-sharing location — migration-only (see
+    // services/workspaceService.js). Nothing new is ever written here.
     match /teachers/{teacherId}/classrooms/{classroomId} {
       allow read, write: if request.auth != null && request.auth.uid == teacherId;
     }

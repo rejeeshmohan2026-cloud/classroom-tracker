@@ -65,7 +65,7 @@ function handleNewClassroom() {
   openNewClassroomModal({
     onCreate: (details, close) => {
       try {
-        const classroom = workspaceService.createClassroom(details);
+        const classroom = workspaceService.createClassroom(details, currentUser);
         close();
         router.navigate(`/classroom/${classroom.id}/setup`);
       } catch (error) {
@@ -131,6 +131,7 @@ function renderRoute(route) {
     } else if (route.name === 'settings') {
       renderSettingsView(appContainer, {
         classroom,
+        currentUser,
         section: route.section,
         onBack: () => router.navigate(`/classroom/${classroom.id}`),
         onNavigateSection: (section) =>
@@ -227,6 +228,7 @@ function init() {
     workspaceService
       .initForUser(
         user.uid,
+        user.displayName,
         () => {
           workspaceLoading = false;
           // TEMPORARY debug panel update.

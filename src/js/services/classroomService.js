@@ -1,11 +1,19 @@
 /**
  * services/classroomService.js
  *
- * Holds the in-memory list of Classrooms for the current Workspace and
- * exposes classroom-level operations (create, update, delete, list, and
- * importing a roster into an already-created classroom). workspaceService
- * is responsible for loading/persisting this list via storage — this
- * module only manages it in memory and builds new records.
+ * Holds the in-memory list of Classrooms the signed-in teacher belongs
+ * to (as owner or teacher) and exposes classroom-level operations
+ * (create, update, delete, list, and importing a roster into an
+ * already-created classroom). workspaceService is responsible for
+ * loading/persisting this list via Firestore — this module only manages
+ * it in memory and builds new records.
+ *
+ * Each classroom now arrives from its own independent Firestore
+ * listener (one per classroom the teacher belongs to — see
+ * workspaceService.js), rather than one batch read of "all my
+ * classrooms" — so this module updates one classroom at a time
+ * (upsertClassroom/removeClassroomFromMemory) instead of replacing the
+ * whole list at once.
  */
 
 import { createClassroom } from '../models/Classroom.js';
@@ -15,6 +23,8 @@ import { getDefaultGroupColor } from '../config/groupColorConfig.js';
 import { isNonEmptyString } from '../utils/validators.js';
 import { buildDefaultSettings } from '../config/classroomDefaults.js';
 import { DEFAULT_BADGE_CATALOG } from '../config/badgeConfig.js';
+import * as memberService from './memberService.js';
+import { MEMBER_ROLES } from '../config/memberRoles.js';
 
 export class ClassroomValidationError extends Error {}
 
@@ -31,17 +41,18 @@ function validateDetails(details) {
  * Backfills fields onto a classroom (and its teams/students/settings)
  * that may not exist yet on data saved by an earlier version of this
  * app — e.g. a classroom saved before Learning Activities, the badge
- * catalog, or per-student notes/badges/history existed. Without this,
- * loading old localStorage data throws deep inside rendering (e.g.
- * `classroom.learningActivities.forEach` on undefined) the moment a
- * screen that needs a newer field opens, which looks like "nothing
- * happens" rather than a clear error.
+ * catalog, per-student notes/badges/history, or (as of this phase)
+ * real membership existed. Without this, loading old data throws deep
+ * inside rendering the moment a screen that needs a newer field opens,
+ * which looks like "nothing happens" rather than a clear error.
  */
 function normalizeClassroom(classroom) {
   const defaults = buildDefaultSettings();
 
-  classroom.administrators = classroom.administrators || [];
-  classroom.teachers = classroom.teachers || [];
+  classroom.members = classroom.members || {};
+  classroom.memberUids = classroom.memberUids || Object.keys(classroom.members);
+  classroom.ownerUid = classroom.ownerUid ?? null;
+
   classroom.teams = (classroom.teams || []).map(normalizeTeam);
   classroom.learningActivities = classroom.learningActivities || [];
 
@@ -72,9 +83,26 @@ function normalizeStudent(student) {
 
 let classrooms = [];
 
-export function replaceClassrooms(newClassrooms = []) {
-  classrooms = newClassrooms.map(normalizeClassroom);
-  return classrooms;
+/** Inserts or replaces one classroom in memory — the unit a Firestore listener delivers. */
+export function upsertClassroom(classroomData) {
+  const normalized = normalizeClassroom(classroomData);
+  const index = classrooms.findIndex((classroom) => classroom.id === normalized.id);
+  if (index === -1) {
+    classrooms.push(normalized);
+  } else {
+    classrooms[index] = normalized;
+  }
+  return normalized;
+}
+
+/** Removes one classroom from memory (e.g. deleted, or this teacher lost access). */
+export function removeClassroomFromMemory(classroomId) {
+  classrooms = classrooms.filter((classroom) => classroom.id !== classroomId);
+}
+
+/** Clears everything — used on sign-out. */
+export function clearAllClassrooms() {
+  classrooms = [];
 }
 
 export function listClassrooms() {
@@ -88,14 +116,17 @@ export function getClassroomById(id) {
 /**
  * Creates a classroom with only its details (School Name, Grade /
  * Section required; Classroom Name, Academic Year, Description
- * optional) — no teams or members yet. The Setup Wizard (see
+ * optional) — no teams yet. `owner` is the creating teacher's safe
+ * profile ({ uid, displayName }); they're stamped as this classroom's
+ * owner and sole member. The Setup Wizard (see
  * ui/views/SetupWizardView.js) handles importing students, buckets,
  * groups, and scoring afterwards, so every classroom is created this
  * same way regardless of how it'll eventually get its roster.
  */
-export function createEmptyClassroom(details) {
+export function createEmptyClassroom(details, owner) {
   validateDetails(details);
-  const classroom = createClassroom({ ...details });
+  const classroom = createClassroom({ ...details, ownerUid: owner.uid });
+  memberService.addMember(classroom, owner.uid, MEMBER_ROLES.OWNER, owner.displayName);
   classrooms.push(classroom);
   return classroom;
 }
@@ -172,7 +203,7 @@ export function getStudentCount(classroom) {
   return classroom.teams.reduce((sum, team) => sum + team.students.length, 0);
 }
 
-/** Total number of members (administrators + teachers) in a classroom. */
+/** Total number of members (owner + teachers) in a classroom. */
 export function getMemberCount(classroom) {
-  return classroom.administrators.length + classroom.teachers.length;
+  return classroom.memberUids?.length || 0;
 }
