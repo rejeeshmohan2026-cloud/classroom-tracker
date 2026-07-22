@@ -130,6 +130,15 @@ function renderRoute(route) {
         onSelectNotebook: (subjectId, notebookTypeId) =>
           router.navigate(`/classroom/${classroom.id}/notebooks/${subjectId}/${notebookTypeId}`),
         onOpenRecognition: () => router.navigate(`/classroom/${classroom.id}/recognition`),
+        onOpenActivities: () => router.navigate(`/classroom/${classroom.id}/activities`),
+        onSelectPendingTask: (taskTypeId, item) => {
+          if (item.activityId) {
+            router.navigate(`/classroom/${classroom.id}/activities/${item.activityId}`);
+          } else if (item.subjectId && item.notebookTypeId) {
+            const dateSegment = item.dateKey ? `/${item.dateKey}` : '';
+            router.navigate(`/classroom/${classroom.id}/notebooks/${item.subjectId}/${item.notebookTypeId}${dateSegment}`);
+          }
+        },
       });
     } else if (route.name === 'recognition') {
       renderRecognitionScreenView(appContainer, {

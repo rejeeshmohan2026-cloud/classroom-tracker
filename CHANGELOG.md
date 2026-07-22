@@ -215,3 +215,48 @@ Full Playwright pass confirmed: co-winner ties render correctly on both the Dash
 - Perfect Attendance needs an attendance data source before it can move from placeholder to computed category.
 - Student/Parent onboarding remains blocked pending AI Working Committee review.
 - Visual/theme/animation polish — explicitly deferred to Phase 5.
+
+---
+
+## Phase 4 — Teacher Productivity (Header Consolidation)
+
+**Context:** a design-first review of teacher workflow friction concluded that the Dashboard's real gap wasn't missing features but redundant navigation for the two highest-frequency needs (starting Class Mode, resuming a recently-opened notebook) — both already existed and worked, just positioned mid-page behind celebratory content. Rather than adding a new "Quick Start" widget (my original proposal), a simpler approach was approved: **relocate** both into a slot-based header, with zero duplication.
+
+### Features Added
+- **`ClassroomHeader`**: a new, generic slot-based header component (`Primary Action` / `Secondary Content` / `Classroom Context`) — deliberately not coupled to any specific widget, so a future phase can change what fills either slot without touching this file.
+- **Start Class Mode relocated** into the header's Primary Action slot — visible with zero scrolling the instant a teacher opens a classroom. Removed from the Teaching section (not duplicated).
+- **Continue Working relocated** into the header's Secondary Content slot — same one-time-read loading pattern as before, just appending into a different container. Removed from its previous mid-page position (not duplicated).
+- **Activities upgraded from a disabled placeholder to a real shortcut** into the existing, already-built Learning Activities feature (`ActivitiesView.js`) — the feature itself was never unbuilt; the Dashboard simply hadn't grown a direct link to it until now.
+- **Pending Tasks made actionable**: each item is now clickable (via a new `onSelectTask` callback), deep-linking straight to the relevant Notebook Register View or Activity roster. No changes to `pendingTaskService.js` itself — every checker already returned everything a link needs (`subjectId`/`notebookTypeId`/`dateKey`, or `activityId`).
+
+### Files Created
+- `src/js/ui/components/ClassroomHeader.js`
+
+### Files Modified
+- `src/js/ui/views/DashboardView.js` — assembles the new header; removed `ClassModeWidget` from the Teaching section and the old `continueWorkingSlot` from mid-page content; Activities placeholder replaced with a real link; Pending Tasks now receives `onSelectPendingTask`.
+- `src/js/ui/components/PendingTasksWidget.js` — items render as buttons (via the optional `onSelectTask` callback) rather than plain text when the callback is provided.
+- `src/js/main.js` — added `onOpenActivities` and `onSelectPendingTask` to the dashboard route; the latter interprets each Pending Task item's shape (`activityId` vs. `subjectId`+`notebookTypeId`(+`dateKey`)) to build the correct navigation target.
+- `src/css/styles.css` — structural CSS for the header's three slots and the clickable Pending Task links (layout only, no visual polish).
+
+### Breaking Changes
+None. Every relocation removes a widget from exactly one place and adds it to exactly one other — confirmed by direct testing that "Start Class Mode" and "Continue Working" each appear exactly once on the page, never zero, never two.
+
+### Regression Verification
+Full Playwright pass confirmed: header renders both slots correctly on a brand-new classroom; neither Start Class Mode nor Continue Working appears anywhere else on the page; the Activities link is genuinely enabled and navigates to the real Learning Activities list; a Pending Task for an unchecked notebook deep-links to its Register View (today, no explicit date needed) and disappears from the list once marked; a Pending Task for an activity awaiting completion deep-links to that activity's roster; Class Mode via the header still launches correctly and "Back" still returns to the Dashboard; the Recognition Screen remains reachable via "View All." Every Phase 1–3 capability continues to work.
+
+### Architectural Decisions Made During Implementation
+- **`ClassroomHeader` is intentionally generic**, per the explicit design refinement — it exposes three named slots and has no knowledge of what's inside them. This phase fills Primary Action and Secondary Content with existing, unmodified widgets; a future phase could put something else in either slot without any change to this component.
+- **Notebook quick-open was explicitly not built.** Continue Working only covers notebooks opened recently; a specific, not-recently-opened notebook still requires the Subjects → Notebook Tracker path. Assessed as the lowest-frequency of the identified needs and deliberately deferred rather than added to the header, per the explicit decision to keep the header simplification narrow rather than reintroducing scope it was meant to avoid.
+- **Recently Viewed Students was explicitly not built**, per the approved scope — remains a recommended future feature, intentionally kept independent from Continue Working rather than merged into a broader "recent work" concept (see the Phase 4 design discussion's trade-off analysis).
+- **Award Stars was explicitly rejected as a Dashboard shortcut** — awarding a star outside Class Mode's existing Undo-stack-aware flow risks fragmenting the one coherent scoring model this app deliberately built; Class Mode continues to be the only way to award stars.
+- **Pending Task navigation logic lives in `main.js`, not inside `PendingTasksWidget.js`** — consistent with this app's established pattern (e.g. the Notebook Register's `recordRecentNotebook` call site) of keeping routing decisions at the `main.js` dispatch boundary, with components themselves staying free of `router` imports.
+
+### Future TODOs
+- Notebook quick-open (a flat shortcut list of configured notebook types, skipping the Notebook Tracker list screen) — identified as a real but lower-priority gap; not scheduled.
+- Recently Viewed Students — approved in principle as a future, independent widget following Continue Working's exact one-time-read pattern; not scheduled.
+- Build the teacher-only Student Dashboard preview (Phase "Student Preview") — no authentication, no student accounts.
+- Printable certificate / Wall of Fame / assembly-announcement presentation of `RecognitionCard` — designed for, not built.
+- Teacher's Choice, once implemented, needs its own explicitly write-capable service, kept separate from the read-only Progress Engine.
+- Perfect Attendance needs an attendance data source before it can move from placeholder to computed category.
+- Student/Parent onboarding remains blocked pending AI Working Committee review.
+- Visual/theme/animation polish — explicitly deferred.

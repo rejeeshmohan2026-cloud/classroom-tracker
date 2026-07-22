@@ -2041,3 +2041,41 @@ button.wizard-checklist__row:hover {
 .dashboard-widget__header-row .dashboard-widget__heading {
   margin: 0;
 }
+
+/* Classroom Dashboard header (Phase 4) — Primary Action / Secondary
+   Content slots, in addition to the existing classroom context block.
+   Structural only, matching this whole feature's "no visual polish yet"
+   scope. */
+
+.classroom-header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.classroom-header__context {
+  flex: 1 1 100%;
+}
+
+.classroom-header__primary-action {
+  flex: 0 0 auto;
+}
+
+.classroom-header__secondary-content {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+
+/* Pending Tasks — clickable items (Phase 4) */
+
+.dashboard-widget__task-link {
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-cyan);
+  cursor: pointer;
+  text-decoration: underline;
+}
