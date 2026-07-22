@@ -4,7 +4,8 @@
  * A small hash-based router — no library, matching the project's
  * "vanilla only" constraint. Recognises:
  *   #/                                        -> home (or welcome, decided by main.js)
- *   #/classroom/{id}                          -> tracker
+ *   #/classroom/{id}                          -> dashboard (the classroom's landing page)
+ *   #/classroom/{id}/class-mode               -> tracker (today's Class Mode — unchanged, just relocated)
  *   #/classroom/{id}/settings/{section?}      -> settings
  *   #/classroom/{id}/setup/{step?}            -> setup wizard (no step = overview)
  *   #/classroom/{id}/student/{studentId}/{tab?} -> student profile
@@ -22,6 +23,9 @@ function parseHash() {
   const parts = hash.split('/').filter(Boolean);
 
   if (parts[0] === 'classroom' && parts[1]) {
+    if (parts[2] === 'class-mode') {
+      return { name: 'tracker', classroomId: parts[1] };
+    }
     if (parts[2] === 'settings') {
       return { name: 'settings', classroomId: parts[1], section: parts[3] || 'general' };
     }
@@ -49,7 +53,7 @@ function parseHash() {
       }
       return { name: 'notebookRegister', classroomId: parts[1], subjectId, notebookTypeId, dateKey: parts[5] || null };
     }
-    return { name: 'tracker', classroomId: parts[1] };
+    return { name: 'dashboard', classroomId: parts[1] };
   }
 
   return { name: 'home' };

@@ -18,6 +18,7 @@
 
 import * as workspaceService from './services/workspaceService.js';
 import * as authService from './services/authService.js';
+import * as continueWorkingService from './services/continueWorkingService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
@@ -30,6 +31,7 @@ import { renderActivitiesListView, renderActivityRosterView } from './ui/views/A
 import { renderNotebookTrackerView } from './ui/views/NotebookTrackerView.js';
 import { renderNotebookRegisterView } from './ui/views/NotebookRegisterView.js';
 import { renderNotebookTimelineView } from './ui/views/NotebookTimelineView.js';
+import { renderDashboardView } from './ui/views/DashboardView.js';
 import { renderLoginView } from './ui/views/LoginView.js';
 import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
@@ -71,6 +73,7 @@ function handleNewClassroom() {
 }
 
 const CLASSROOM_ROUTE_NAMES = [
+  'dashboard',
   'tracker',
   'settings',
   'setup',
@@ -114,10 +117,21 @@ function renderRoute(route) {
       return;
     }
 
-    if (route.name === 'tracker') {
+    if (route.name === 'dashboard') {
+      renderDashboardView(appContainer, {
+        classroom,
+        currentUser,
+        onOpenSettings: () => router.navigate(`/classroom/${classroom.id}/settings`),
+        onOpenNotebookTracker: () => router.navigate(`/classroom/${classroom.id}/notebooks`),
+        onOpenGroups: () => router.navigate(`/classroom/${classroom.id}/settings/groups`),
+        onStartClassMode: () => router.navigate(`/classroom/${classroom.id}/class-mode`),
+        onSelectNotebook: (subjectId, notebookTypeId) =>
+          router.navigate(`/classroom/${classroom.id}/notebooks/${subjectId}/${notebookTypeId}`),
+      });
+    } else if (route.name === 'tracker') {
       renderTrackerView(appContainer, {
         classroom,
-        onBack: () => router.navigate('/'),
+        onBack: () => router.navigate(`/classroom/${classroom.id}`),
         onSettings: () => router.navigate(`/classroom/${classroom.id}/settings`),
         onActivities: () => router.navigate(`/classroom/${classroom.id}/activities`),
         onNotebooks: () => router.navigate(`/classroom/${classroom.id}/notebooks`),
@@ -171,6 +185,11 @@ function renderRoute(route) {
           router.navigate(`/classroom/${classroom.id}/notebooks/${subjectId}/${notebookTypeId}`),
       });
     } else if (route.name === 'notebookRegister') {
+      continueWorkingService.recordRecentNotebook(currentUser?.uid, {
+        classroomId: classroom.id,
+        subjectId: route.subjectId,
+        notebookTypeId: route.notebookTypeId,
+      });
       renderNotebookRegisterView(appContainer, {
         classroom,
         subjectId: route.subjectId,

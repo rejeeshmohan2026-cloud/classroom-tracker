@@ -85,4 +85,18 @@ export class ClassroomRepository {
   subscribeToRecentNotebooks(uid, onChange, onError) {
     throw new Error('ClassroomRepository.subscribeToRecentNotebooks() must be implemented by a subclass');
   }
+
+  /**
+   * One-time read of this uid's recently-opened-notebooks list — used by
+   * the Dashboard's Continue Working widget, which renders once per
+   * visit rather than staying live-subscribed (see
+   * services/continueWorkingService.js's getRecentOnce() for why: this
+   * app has no view-unmount hook yet to safely tear down a
+   * view-scoped subscription, so a one-time read is the honest choice
+   * until that exists).
+   */
+  // eslint-disable-next-line no-unused-vars
+  async getRecentNotebooksOnce(uid) {
+    throw new Error('ClassroomRepository.getRecentNotebooksOnce() must be implemented by a subclass');
+  }
 }

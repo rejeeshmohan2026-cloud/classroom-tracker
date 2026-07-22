@@ -40,3 +40,18 @@ export function recordRecentNotebook(uid, { classroomId, subjectId, notebookType
 export function subscribeToRecent(uid, onChange, onError) {
   return repository.subscribeToRecentNotebooks(uid, onChange, onError);
 }
+
+/**
+ * One-time read, for the Dashboard's Continue Working widget — see the
+ * repository interface's doc comment on getRecentNotebooksOnce() for
+ * why this widget doesn't stay live-subscribed.
+ */
+export async function getRecentOnce(uid) {
+  if (!uid) return [];
+  try {
+    return await repository.getRecentNotebooksOnce(uid);
+  } catch (error) {
+    console.error('[continueWorkingService] Failed to load recently opened notebooks:', error);
+    return [];
+  }
+}

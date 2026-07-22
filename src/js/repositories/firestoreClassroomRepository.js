@@ -30,6 +30,7 @@ import {
   persistentMultipleTabManager,
   collection,
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -187,6 +188,11 @@ class FirestoreClassroomRepository extends ClassroomRepository {
       (docSnapshot) => onChange(docSnapshot.exists() ? docSnapshot.data().recentNotebooks || [] : []),
       (error) => onError?.(error)
     );
+  }
+
+  async getRecentNotebooksOnce(uid) {
+    const docSnapshot = await getDoc(this._userDoc(uid));
+    return docSnapshot.exists() ? docSnapshot.data().recentNotebooks || [] : [];
   }
 }
 
