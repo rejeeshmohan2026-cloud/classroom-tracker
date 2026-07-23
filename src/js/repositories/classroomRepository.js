@@ -115,4 +115,21 @@ export class ClassroomRepository {
   async setThemePreference(uid, theme) {
     throw new Error('ClassroomRepository.setThemePreference() must be implemented by a subclass');
   }
+
+  /**
+   * Accent color preference (see services/accentColorPreferenceService.js)
+   * — a new field (accentColor), not a repurposing of the retired
+   * theme field above, since "theme" no longer has a clear meaning in
+   * this app and reusing its name for a different concept would be
+   * confusing later.
+   */
+  // eslint-disable-next-line no-unused-vars
+  async getAccentColorPreferenceOnce(uid) {
+    throw new Error('ClassroomRepository.getAccentColorPreferenceOnce() must be implemented by a subclass');
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  async setAccentColorPreference(uid, colorId) {
+    throw new Error('ClassroomRepository.setAccentColorPreference() must be implemented by a subclass');
+  }
 }

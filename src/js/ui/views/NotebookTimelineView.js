@@ -5,8 +5,20 @@
  * View (today's fast marking workflow). Student-first, matching how a
  * teacher actually asks the question ("How has Hari been doing?" rather
  * than "What happened on July 3?"): one row per student, each a
- * horizontal run of day-symbols for the currently-viewed month, with
- * month navigation. Defaults to the current month.
+ * horizontal run of day-symbols for the currently-viewed period.
+ *
+ * Defaults to the current WEEK (Monday-start, via dateHelpers'
+ * getWeekRange) rather than the current month — a full month of dots
+ * is a lot to take in at once for a "how's this week going" glance,
+ * which is the more common question. A Weekly/Monthly toggle switches
+ * between the two.
+ *
+ * View mode and navigation position are tracked as local state via this
+ * view's own rerender closure (the same pattern TrackerView.js already
+ * uses for Class Mode), not the URL/router — unlike the Register View's
+ * date, which stays meaningfully bookmarkable, exactly which week or
+ * month of a read-only history view you're looking at doesn't carry
+ * the same need to survive a page reload or be shareable as a link.
  */
 
 import * as notebookConfigService from '../../services/notebookConfigService.js';
@@ -14,11 +26,25 @@ import * as notebookService from '../../services/notebookService.js';
 import { createNotebookTimelineElement } from '../components/NotebookTimeline.js';
 import { createEmptyStateElement } from '../components/EmptyState.js';
 import { NOTEBOOK_TIMELINE_SYMBOLS, NOTEBOOK_TIMELINE_STATUS_LABELS, deriveDaySymbolKey } from '../../config/notebookStatuses.js';
-import { getCurrentYearMonth, shiftYearMonth, formatYearMonth, getDaysInYearMonth } from '../../utils/dateHelpers.js';
+import {
+  getTodayDateKey,
+  shiftDateKey,
+  getWeekRange,
+  getDaysInYearMonth,
+  getCurrentYearMonth,
+  shiftYearMonth,
+  formatYearMonth,
+  formatDateKey,
+} from '../../utils/dateHelpers.js';
+
+function formatWeekRangeLabel(start, end) {
+  return `${formatDateKey(start)} \u2013 ${formatDateKey(end)}`;
+}
 
 export function renderNotebookTimelineView(container, props) {
-  const { classroom, subjectId, notebookTypeId, onBack, onNavigateMonth } = props;
-  const yearMonth = props.yearMonth || getCurrentYearMonth();
+  const { classroom, subjectId, notebookTypeId, onBack } = props;
+  const viewMode = props.viewMode || 'week';
+  const referenceDateKey = props.referenceDateKey || getTodayDateKey();
 
   container.innerHTML = '';
 
@@ -29,6 +55,9 @@ export function renderNotebookTimelineView(container, props) {
     container.appendChild(createEmptyStateElement({ message: 'This notebook could not be found.' }));
     return;
   }
+
+  const rerender = (next) =>
+    renderNotebookTimelineView(container, { ...props, viewMode, referenceDateKey, ...next });
 
   const wrapper = document.createElement('div');
   wrapper.className = 'activities-view';
@@ -46,32 +75,65 @@ export function renderNotebookTimelineView(container, props) {
   titleEl.className = 'tracker-header__title';
   titleEl.textContent = `${subject.name} \u00b7 ${notebookType.name} \u00b7 Timeline`;
 
-  header.append(backButton, titleEl);
+  const modeToggle = document.createElement('div');
+  modeToggle.className = 'toggle-group tracker-header__actions';
+  ['week', 'month'].forEach((mode) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'toggle-group__button' + (viewMode === mode ? ' toggle-group__button--active' : '');
+    button.textContent = mode === 'week' ? 'Weekly' : 'Monthly';
+    button.addEventListener('click', () => rerender({ viewMode: mode }));
+    modeToggle.appendChild(button);
+  });
+
+  header.append(backButton, titleEl, modeToggle);
   wrapper.appendChild(header);
 
-  const monthBar = document.createElement('div');
-  monthBar.className = 'notebook-date-bar';
+  const dateBar = document.createElement('div');
+  dateBar.className = 'notebook-date-bar';
 
   const prevButton = document.createElement('button');
   prevButton.type = 'button';
   prevButton.className = 'btn btn--text';
   prevButton.textContent = '\u2190';
-  prevButton.setAttribute('aria-label', 'Previous month');
-  prevButton.addEventListener('click', () => onNavigateMonth(shiftYearMonth(yearMonth, -1)));
 
-  const monthLabel = document.createElement('span');
-  monthLabel.className = 'notebook-date-bar__label';
-  monthLabel.textContent = formatYearMonth(yearMonth);
+  const dateLabel = document.createElement('span');
+  dateLabel.className = 'notebook-date-bar__label';
 
   const nextButton = document.createElement('button');
   nextButton.type = 'button';
   nextButton.className = 'btn btn--text';
   nextButton.textContent = '\u2192';
-  nextButton.setAttribute('aria-label', 'Next month');
-  nextButton.addEventListener('click', () => onNavigateMonth(shiftYearMonth(yearMonth, 1)));
 
-  monthBar.append(prevButton, monthLabel, nextButton);
-  wrapper.appendChild(monthBar);
+  let rangeStart;
+  let rangeEnd;
+
+  if (viewMode === 'week') {
+    const { start, end } = getWeekRange(referenceDateKey);
+    rangeStart = start;
+    rangeEnd = end;
+    dateLabel.textContent = formatWeekRangeLabel(start, end);
+    prevButton.setAttribute('aria-label', 'Previous week');
+    prevButton.addEventListener('click', () => rerender({ referenceDateKey: shiftDateKey(referenceDateKey, -7) }));
+    nextButton.setAttribute('aria-label', 'Next week');
+    nextButton.addEventListener('click', () => rerender({ referenceDateKey: shiftDateKey(referenceDateKey, 7) }));
+  } else {
+    const yearMonth = referenceDateKey.slice(0, 7) || getCurrentYearMonth();
+    rangeStart = `${yearMonth}-01`;
+    rangeEnd = `${yearMonth}-${String(getDaysInYearMonth(yearMonth)).padStart(2, '0')}`;
+    dateLabel.textContent = formatYearMonth(yearMonth);
+    prevButton.setAttribute('aria-label', 'Previous month');
+    prevButton.addEventListener('click', () =>
+      rerender({ referenceDateKey: `${shiftYearMonth(yearMonth, -1)}-01` })
+    );
+    nextButton.setAttribute('aria-label', 'Next month');
+    nextButton.addEventListener('click', () =>
+      rerender({ referenceDateKey: `${shiftYearMonth(yearMonth, 1)}-01` })
+    );
+  }
+
+  dateBar.append(prevButton, dateLabel, nextButton);
+  wrapper.appendChild(dateBar);
 
   const legend = document.createElement('p');
   legend.className = 'profile-section__meta notebook-timeline-legend';
@@ -89,19 +151,18 @@ export function renderNotebookTimelineView(container, props) {
   if (allStudents.length === 0) {
     content.appendChild(createEmptyStateElement({ message: 'There are no students in this classroom yet.' }));
   } else {
-    const daysInMonth = getDaysInYearMonth(yearMonth);
-
     allStudents.forEach(({ student }) => {
       const days = [];
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateKey = `${yearMonth}-${String(day).padStart(2, '0')}`;
-        const entry = notebookService.getEntry(classroom, subjectId, notebookTypeId, dateKey, student.id);
+      let cursor = rangeStart;
+      while (cursor <= rangeEnd) {
+        const entry = notebookService.getEntry(classroom, subjectId, notebookTypeId, cursor, student.id);
         const symbolKey = deriveDaySymbolKey(entry);
         days.push({
-          dateKey,
+          dateKey: cursor,
           symbol: NOTEBOOK_TIMELINE_SYMBOLS[symbolKey],
           statusLabel: NOTEBOOK_TIMELINE_STATUS_LABELS[symbolKey],
         });
+        cursor = shiftDateKey(cursor, 1);
       }
 
       content.appendChild(createNotebookTimelineElement({ label: student.name, days }));

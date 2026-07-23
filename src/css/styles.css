@@ -39,7 +39,15 @@
      light for white text to pass contrast (2.17:1); even
      --color-primary-strong isn't dark enough (3.58:1). This is,
      verified at 4.81:1. */
-  --color-primary-deep: #1565c0; /* unified flat blue — verified 5.75:1 with white text, replacing the earlier color-mix approach for consistency with the flat-color direction */
+  --color-primary-deep: #1565c0; /* unified flat blue — this is the accent color a teacher can choose between 5 options for; see config/accentColorConfig.js and services/accentColorService.js, which override this and the two tokens below via inline style once a preference loads */
+  /* Paired with --color-primary-deep: some of the 5 accent options are
+     light enough that white text fails (Ocean 2.64:1, Sunset 3.19:1) —
+     dark ink is what actually passes for those two. Every option's
+     correct pairing is computed once, in accentColorConfig.js, not
+     re-derived here; these are just the Classic-matching defaults so
+     the app looks right before any preference has loaded. */
+  --color-on-primary-deep: #ffffff;
+  --shadow-on-primary-deep: 0 1px 3px rgba(0, 0, 0, 0.35);
   --color-success: var(--color-lime); /* TFI Lime Green — brand's documented "secondary accent"; reads as complete/positive */
   --color-warning: var(--color-yellow); /* TFI Yellow — unchanged, already this role today */
   --color-accent: var(--color-gold); /* TFI-adjacent gold — replaces orange per explicit direction ("not liking the orange theme"); ties to trophy/star imagery already in Recognition */
@@ -223,6 +231,21 @@ select:focus {
   cursor: pointer;
   transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
 }
+/*
+ * Icon-only variant — "keep it clean by replacing text with icons."
+ * Square, centered, sized for a single glyph; aria-label/title on the
+ * button itself carry what the text used to say, so this stays
+ * accessible even without visible text.
+ */
+.btn--icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1.2rem;
+}
 
 .btn:active {
   transform: scale(0.97);
@@ -272,7 +295,7 @@ select:focus {
      comment): 5.49:1/3.3:1 with white text, using the WCAG large-text
      exception since this button's text is bold — same honest tradeoff
      already agreed on for the Hero. */
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
   border-color: transparent;
   /* Phase 7B — intent hierarchy: Action-intent buttons (this one) get
      real size distinction from Navigation/Utility buttons (Ghost/Text
@@ -280,8 +303,8 @@ select:focus {
   font-size: var(--text-base);
   padding: 0.75rem 1.4rem;
   border-radius: 10px;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 .btn--primary:hover:not(:disabled) {
   /* Darkened from the new flat --color-primary-deep, so hover reads as
@@ -553,7 +576,7 @@ select:focus-visible,
   /* Applied across every page's header, per explicit direction — same
      gradient/contrast approach approved for the Dashboard Hero (see
      .classroom-hero's own comment for the full contrast math). */
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
 }
 /*
  * The Dashboard's own header (ClassroomHeader.js) is excluded from the
@@ -578,15 +601,15 @@ select:focus-visible,
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-black);
   margin: 0;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .tracker-header__subtitle {
   margin: 0.15rem 0 0;
   font-size: var(--text-sm);
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 /* Back/secondary buttons inside any gradient header need light text —
@@ -595,8 +618,8 @@ select:focus-visible,
 .tracker-header .btn--text,
 .settings-header .btn--text,
 .profile-header .btn--text {
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 .tracker-header .btn--text:hover,
 .settings-header .btn--text:hover,
@@ -613,18 +636,18 @@ select:focus-visible,
  * different, not just another ghost button.
  */
 .tracker-header .btn--ghost {
-  border-color: rgba(255, 255, 255, 0.6);
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  border-color: color-mix(in srgb, var(--color-on-primary-deep) 60%, transparent);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 .tracker-header .btn--ghost:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-color: #ffffff;
+  background-color: color-mix(in srgb, var(--color-on-primary-deep) 15%, transparent);
+  border-color: var(--color-on-primary-deep);
 }
 .tracker-header .btn--danger {
   border-color: transparent;
   background-color: #b44236; /* darkened danger red — verified 5.57:1 with white text, plain danger-red only reaches 3.8:1 */
-  color: #ffffff;
+  color: #ffffff; /* fixed — this is a fixed red, not the accent color, so it doesn't follow the dynamic text-color token */
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 .tracker-header .btn--danger:hover:not(:disabled) {
@@ -686,8 +709,8 @@ select:focus-visible,
   gap: 0.75rem;
   padding: 1rem 1.15rem;
   background-color: var(--color-primary-deep);
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .team-card__name {
@@ -808,15 +831,15 @@ select:focus-visible,
   align-items: center;
   gap: 1rem;
   padding: 1.25rem 1.5rem;
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
 }
 
 .settings-header__title {
   font-size: 1.2rem;
   font-weight: var(--font-weight-black);
   margin: 0;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .settings-tabs {
@@ -1330,7 +1353,7 @@ button.wizard-checklist__row:hover {
 
 .profile-header {
   padding: 1.25rem 1.5rem 1.5rem;
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
 }
 
 .profile-header__title-block {
@@ -1341,15 +1364,15 @@ button.wizard-checklist__row:hover {
   font-size: 1.4rem;
   font-weight: var(--font-weight-black);
   margin: 0;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .profile-header__group {
   margin: 0.15rem 0 0;
   font-size: 0.9rem;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .profile-header__stats {
@@ -1937,12 +1960,150 @@ button.wizard-checklist__row:hover {
    theme) since the bar itself never does. Verified against
    --color-chrome-bg specifically: #b8bcc0 text = 9.11:1, #6b7075
    border = 3.48:1 (WCAG requires 3.0 for UI component borders). */
-.user-bar__theme-selector .toggle-group__button {
-  color: #b8bcc0;
-  border-color: #6b7075;
+/*
+ * Accent color picker — 5 swatches, replacing the retired
+ * Light/Dark/System theme selector in the same spot. Sits on the
+ * user-bar's fixed dark chrome background (--color-chrome-bg), so the
+ * ring/border treatment is verified against that specific fixed dark
+ * tone, not against whichever accent color happens to be active.
+ */
+.user-bar__right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
-.user-bar__theme-selector .toggle-group__button:hover {
-  border-color: var(--color-primary);
+.user-bar__color-editor {
+  position: relative;
+}
+/* Icon-only per explicit direction — no "Edit" text label, just the
+   current-color swatch and a pencil icon. */
+.user-bar__color-edit-button {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+.user-bar__color-edit-button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.user-bar__color-edit-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+.user-bar__color-edit-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+/*
+ * The popover — anchored just below the Edit button, hidden by default.
+ * A small, self-contained panel rather than this app's existing
+ * full-screen bottom-sheet pattern (QuickActionsSheet.js), which would
+ * be disproportionate for a small settings tweak like this one.
+ */
+.user-bar__color-popover {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-dialog);
+  padding: 0.75rem;
+  gap: 0.65rem;
+  z-index: 20;
+}
+.user-bar__color-popover--open {
+  display: flex;
+}
+.user-bar__color-presets {
+  display: flex;
+  gap: 0.5rem;
+}
+.user-bar__color-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.user-bar__color-swatch:hover {
+  transform: scale(1.1);
+}
+.user-bar__color-swatch--active {
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+/*
+ * The real spectrum/gradient picker — a hue-tinted square (saturation
+ * left-to-right, value/lightness top-to-bottom, via two overlaid CSS
+ * gradients) with a draggable marker dot, plus a separate hue strip.
+ * This is what "spectrum color picker" specifically meant: an inline
+ * visual control, not the browser's native OS color dialog.
+ */
+.spectrum-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 200px;
+}
+.spectrum-picker__square {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  border-radius: var(--radius-control);
+  background-image: linear-gradient(to top, #000000, transparent), linear-gradient(to right, #ffffff, transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+.spectrum-picker__marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.spectrum-picker__hue-slider {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background-image: linear-gradient(
+    to right,
+    #ff0000 0%,
+    #ffff00 17%,
+    #00ff00 33%,
+    #00ffff 50%,
+    #0000ff 67%,
+    #ff00ff 83%,
+    #ff0000 100%
+  );
+  cursor: pointer;
+  touch-action: none;
+}
+.spectrum-picker__hue-handle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 /* Notebook Tracker — Register View (fast entry) and Timeline View (read-only) */
@@ -1962,6 +2123,28 @@ button.wizard-checklist__row:hover {
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
+}
+
+/*
+ * Compact status dropdowns — replacing a row of toggle buttons per
+ * status option (which grows wider and more overwhelming every time a
+ * new status gets added). A select's width doesn't change no matter
+ * how many options it holds.
+ */
+.notebook-status-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.notebook-status-select__label {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.notebook-status-select__input {
+  min-width: 9rem;
 }
 
 .notebook-checking-row__name {
@@ -2529,11 +2712,11 @@ button.wizard-checklist__row:hover {
 .kpi-card__number {
   font-size: var(--text-2xl);
   font-weight: var(--font-weight-black);
-  color: #ffffff;
+  color: var(--color-on-primary-deep);
 }
 .kpi-card__label {
   font-size: var(--text-sm);
-  color: #ffffff;
+  color: var(--color-on-primary-deep);
 }
 
 /*
@@ -2563,15 +2746,15 @@ button.wizard-checklist__row:hover {
 .dashboard-widget--recognition {
   /* Same gradient as the Hero (see its comment for the contrast math
      and the honest tradeoff being made). */
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
 }
 .dashboard-widget--recognition.dashboard-widget--celebrate .dashboard-widget__heading {
   color: var(--color-chrome-text);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 .dashboard-widget--recognition .btn--text {
   color: var(--color-chrome-text);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 .dashboard-widget--recognition .btn--text:hover {
   color: var(--color-primary);
@@ -2722,7 +2905,7 @@ button.wizard-checklist__row:hover {
      additional co-winners cycle through gold/pink for variety, matching
      the same cycling pattern already used for Groups' huddle avatars. */
   background-color: var(--color-primary-deep);
-  color: #ffffff;
+  color: var(--color-on-primary-deep);
   font-weight: var(--font-weight-bold);
   font-size: 1rem;
 }
@@ -2740,9 +2923,11 @@ button.wizard-checklist__row:hover {
 }
 .recognition-card__winner:nth-child(2) .recognition-card__avatar {
   background-color: #8d6a16; /* darkened gold — verified 4.99:1 with white text */
+  color: #ffffff; /* fixed — this background doesn't change with the accent color choice, unlike the default (first) avatar */
 }
 .recognition-card__winner:nth-child(3) .recognition-card__avatar {
   background-color: #a73e55; /* darkened pink — verified 6.06:1 with white text */
+  color: #ffffff;
 }
 /*
  * The team-icon emoji (👥) has its own baked-in colors that CSS
@@ -2901,7 +3086,7 @@ button.wizard-checklist__row:hover {
      not hidden; the text-shadow below is a real, separate technique to
      help actual legibility, since it's not something the WCAG ratio
      formula accounts for at all. */
-  background-color: #1565c0; /* flat color, replacing the gradient per explicit direction — verified 5.75:1 with white text */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
   border-radius: var(--radius-card);
   padding: 1.25rem 1.5rem;
 }
@@ -2912,8 +3097,8 @@ button.wizard-checklist__row:hover {
 .classroom-hero .tracker-header__subtitle,
 .classroom-hero__greeting,
 .classroom-hero__motto {
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
 }
 
 .classroom-header__primary-action {

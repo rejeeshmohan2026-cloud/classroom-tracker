@@ -19,6 +19,8 @@
 import * as workspaceService from './services/workspaceService.js';
 import * as authService from './services/authService.js';
 import * as continueWorkingService from './services/continueWorkingService.js';
+import * as accentColorService from './services/accentColorService.js';
+import * as accentColorPreferenceService from './services/accentColorPreferenceService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
@@ -41,6 +43,53 @@ let appContainer = null;
 let userBarContainer = null;
 let currentUser = null;
 let workspaceLoading = false;
+let currentAccentColorId = 'ocean';
+
+function handleSelectAccentColor(colorId) {
+  currentAccentColorId = colorId;
+  accentColorService.applyAccentColor(colorId); // optimistic — applies immediately, doesn't wait on the save below
+  accentColorPreferenceService.setPreference(currentUser?.uid, colorId);
+  renderUserBar(userBarContainer, {
+    user: currentUser,
+    onSignOut: handleSignOut,
+    currentAccentColorId,
+    onSelectAccentColor: handleSelectAccentColor,
+    onSelectCustomAccentColor: handleSelectCustomAccentColor,
+  });
+}
+
+/**
+ * Spectrum picker drag-end (a real color has been committed, not just
+ * previewed) — persists it and updates the tracked state, but
+ * deliberately does NOT call renderUserBar(). A full re-render would
+ * reset the popover back to closed, which — unlike a single preset
+ * click, where closing after a deliberate one-shot choice is the right
+ * UX — would be disruptive here: a teacher adjusting hue and then
+ * saturation/value in the same sitting would have the whole popover
+ * vanish after the very first adjustment. The small edit-button swatch
+ * preview will simply reflect this on the next natural re-render
+ * (e.g. the next navigation), rather than instantly — an acceptable
+ * trade for not disrupting an in-progress color adjustment.
+ */
+function handleSelectCustomAccentColor(hex) {
+  currentAccentColorId = hex;
+  accentColorService.applyCustomAccentColor(hex);
+  accentColorPreferenceService.setPreference(currentUser?.uid, hex);
+}
+
+/**
+ * Live preview while dragging the spectrum picker — applies the color
+ * to the page immediately (cheap: three CSS custom-property writes),
+ * but deliberately does NOT persist or re-render UserBar. The spectrum
+ * picker's onChange fires on every pointermove; re-rendering UserBar
+ * on every one of those would tear down and rebuild the very element
+ * mid-drag (destroying its pointer capture) and spam Firestore writes
+ * on every pixel of movement. Only onChangeComplete (drag release)
+ * calls the commit path above.
+ */
+function handlePreviewCustomAccentColor(hex) {
+  accentColorService.applyCustomAccentColor(hex);
+}
 
 function handleSignIn() {
   authService.signInWithGoogle().catch((error) => {
@@ -105,7 +154,14 @@ function renderRoute(route) {
     return;
   }
 
-  renderUserBar(userBarContainer, { user: currentUser, onSignOut: handleSignOut });
+  renderUserBar(userBarContainer, {
+    user: currentUser,
+    onSignOut: handleSignOut,
+    currentAccentColorId,
+    onSelectAccentColor: handleSelectAccentColor,
+    onSelectCustomAccentColor: handleSelectCustomAccentColor,
+    onPreviewCustomAccentColor: handlePreviewCustomAccentColor,
+  });
 
   if (workspaceLoading) {
     renderLoadingScreen(appContainer);
@@ -229,10 +285,7 @@ function renderRoute(route) {
         classroom,
         subjectId: route.subjectId,
         notebookTypeId: route.notebookTypeId,
-        yearMonth: route.yearMonth,
         onBack: () => router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}`),
-        onNavigateMonth: (yearMonth) =>
-          router.navigate(`/classroom/${classroom.id}/notebooks/${route.subjectId}/${route.notebookTypeId}/timeline/${yearMonth}`),
       });
     }
     return;
@@ -266,9 +319,32 @@ function init() {
 
     if (!user) {
       workspaceService.stopListening();
+      currentAccentColorId = 'ocean';
+      accentColorService.applyAccentColor('ocean');
       renderRoute(router.getCurrentRoute());
       return;
     }
+
+    accentColorPreferenceService.getPreferenceOnce(user.uid).then((storedValue) => {
+      currentAccentColorId = storedValue;
+      // A stored value is either one of the 5 preset ids, or a raw hex
+      // from the spectrum picker (always starts with '#') — each needs
+      // its own apply function, since only presets have an authored
+      // text-color override (see accentColorConfig.js's Ocean comment).
+      if (storedValue.startsWith('#')) {
+        accentColorService.applyCustomAccentColor(storedValue);
+      } else {
+        accentColorService.applyAccentColor(storedValue);
+      }
+      renderUserBar(userBarContainer, {
+        user: currentUser,
+        onSignOut: handleSignOut,
+        currentAccentColorId,
+        onSelectAccentColor: handleSelectAccentColor,
+        onSelectCustomAccentColor: handleSelectCustomAccentColor,
+        onPreviewCustomAccentColor: handlePreviewCustomAccentColor,
+      });
+    });
 
     workspaceLoading = true;
     renderRoute(router.getCurrentRoute());

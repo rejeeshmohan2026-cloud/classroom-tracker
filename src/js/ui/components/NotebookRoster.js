@@ -2,12 +2,15 @@
  * ui/components/NotebookRoster.js
  *
  * The fast-entry roster used by the Register View: every student, each
- * with two independent inline toggle-button groups (Submission,
- * Completion) — no dialogs, one tap per status. Extracted from the
- * original Notebook Checking screen so the same rendering can be reused
- * anywhere a roster of inline status toggles is needed. Rendering only —
- * the caller supplies onSetSubmission/onSetCompletion and re-renders
- * itself afterwards.
+ * with two independent status dropdowns (Submission, Completion).
+ * Previously a row of toggle buttons (one per possible value) — that
+ * grows wider and more overwhelming every time a new status option is
+ * added; a dropdown's width doesn't change no matter how many options
+ * it holds, so this scales cleanly as the vocabulary grows. Extracted
+ * from the original Notebook Checking screen so the same rendering can
+ * be reused anywhere a roster of inline status controls is needed.
+ * Rendering only — the caller supplies onSetSubmission/onSetCompletion
+ * and re-renders itself afterwards.
  */
 
 import { SUBMISSION_STATUSES, SUBMISSION_LABELS, COMPLETION_STATUSES, COMPLETION_LABELS } from '../../config/notebookStatuses.js';
@@ -41,18 +44,22 @@ function createRosterRow({ student, team, entry, onSetSubmission, onSetCompletio
   row.appendChild(nameEl);
 
   row.appendChild(
-    createToggleGroup({
+    createStatusSelect({
+      label: 'Submission',
       options: SUBMISSION_STATUSES,
       labels: SUBMISSION_LABELS,
+      placeholder: 'Not marked',
       currentValue: entry?.submission || null,
       onSelect: onSetSubmission,
     })
   );
 
   row.appendChild(
-    createToggleGroup({
+    createStatusSelect({
+      label: 'Completion',
       options: COMPLETION_STATUSES,
       labels: COMPLETION_LABELS,
+      placeholder: 'Not assessed',
       currentValue: entry?.completion || null,
       onSelect: onSetCompletion,
     })
@@ -61,18 +68,36 @@ function createRosterRow({ student, team, entry, onSetSubmission, onSetCompletio
   return row;
 }
 
-function createToggleGroup({ options, labels, currentValue, onSelect }) {
-  const group = document.createElement('div');
-  group.className = 'toggle-group';
+function createStatusSelect({ label, options, labels, placeholder, currentValue, onSelect }) {
+  const wrapper = document.createElement('label');
+  wrapper.className = 'notebook-status-select';
+
+  const labelEl = document.createElement('span');
+  labelEl.className = 'notebook-status-select__label';
+  labelEl.textContent = label;
+  wrapper.appendChild(labelEl);
+
+  const select = document.createElement('select');
+  select.className = 'notebook-status-select__input';
+  select.setAttribute('aria-label', `${label} status`);
+
+  const placeholderOption = document.createElement('option');
+  placeholderOption.value = '';
+  placeholderOption.textContent = placeholder;
+  select.appendChild(placeholderOption);
 
   options.forEach((option) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'toggle-group__button' + (currentValue === option ? ' toggle-group__button--active' : '');
-    button.textContent = labels[option];
-    button.addEventListener('click', () => onSelect(option));
-    group.appendChild(button);
+    const optionEl = document.createElement('option');
+    optionEl.value = option;
+    optionEl.textContent = labels[option];
+    if (currentValue === option) optionEl.selected = true;
+    select.appendChild(optionEl);
   });
 
-  return group;
+  select.addEventListener('change', (event) => {
+    if (event.target.value) onSelect(event.target.value);
+  });
+
+  wrapper.appendChild(select);
+  return wrapper;
 }

@@ -812,3 +812,207 @@ Computed-style checks confirmed: every header/button renders the exact flat blue
 ### Future TODOs
 - Wire Recognition avatars to each winner's actual Learning Bucket color, if wanted — requires extending the Progress Engine's winner data shape (`getRecognitionWinners`/`getLeaderboard`) to include bucket info, a larger, separate change from anything done this phase.
 - (Carried over, unchanged): Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Accent Color Picker — 5 Teacher-Chosen Colors, App-Wide
+
+**Context:** the user's own screenshot of the current flat blue, with a preference for something lighter — but framed as a personal opinion, with a request to let every teacher choose from 5 options (one being their suggested `#5ea6da`) rather than impose one fixed color on everyone.
+
+### A real, repurposed feature, not new infrastructure
+This reuses the exact resolve/apply/persist architecture built for the (now-retired) Light/Dark/System theme selector: a pure "apply" service, a separate "persist" service, and a picker in the same UserBar spot. Rather than leave that pattern as pure dead code (as flagged in an earlier CHANGELOG entry), it's now doing real work again under a new name.
+
+### Features Added
+- **`config/accentColorConfig.js`** — 5 options (Ocean, Classic, Emerald, Plum, Sunset), each with its own verified-correct text color and shadow, not a single assumed white-text-everywhere rule.
+- **A real contrast finding, not assumed**: the user's suggested `#5ea6da` fails outright with white text (2.64:1) — expected for a lighter color, but confirmed by computing it rather than guessing. Rather than force it darker (which would undo the exact "lighter, easier on the eyes" quality being asked for), each of the 5 options got its own computed, correct text color: Ocean and Sunset (the two lighter options) use dark ink (6.58:1 / 5.45:1); Classic, Emerald, and Plum use white (5.75:1 / 5.47:1 / 6.35:1). Emerald's first candidate shade cleared neither threshold comfortably (4.17:1 either way) and was darkened slightly until white passed cleanly.
+- **`services/accentColorService.js`** — applies a choice by setting three CSS custom properties (`--color-primary-deep`, `--color-on-primary-deep`, `--shadow-on-primary-deep`) at the document root. This works with three property overrides, not a file-by-file hunt, specifically *because* every "solid blue chrome" surface from recent phases already referenced these tokens instead of a hardcoded color — the payoff of that earlier unification work.
+- **`services/accentColorPreferenceService.js`** + two new repository methods (`getAccentColorPreferenceOnce`/`setAccentColorPreference`), writing to a new `accentColor` field — a new field, not a repurposing of the retired `theme` field, since reusing that name for an unrelated concept would be confusing later.
+- **`UserBar.js`** — 5 circular swatches replace the retired theme selector in the same spot; the active choice gets a visible ring.
+
+### Two real bugs caught and fixed before this shipped
+- **The flat-color rollout from the previous phase had used a literal hex value, not the CSS variable, in all 6 places it appeared** (`.tracker-header`, `.settings-header`, `.profile-header`, `.classroom-hero`, `.dashboard-widget--recognition`, `.btn--primary`). This meant the very first test of the color picker changed nothing — caught immediately by checking the actual rendered background color after clicking a swatch, not assumed from the code looking right. Fixed by pointing all 6 at `var(--color-primary-deep)`.
+- **The gold/pink cycling Recognition avatars (added two phases ago) would have inherited the new dynamic text-color variable**, even though their backgrounds are fixed gold/pink, not the user's chosen accent — meaning picking a light option (Ocean/Sunset) would have made their text switch to dark ink, which fails badly against gold/pink specifically. Same root issue caught a second time in the fixed Danger button (its solid red fill is not the accent color either). Both pinned back to their own always-correct fixed white.
+
+### Files Modified
+- `src/css/styles.css` — 6 hardcoded backgrounds fixed to use the variable; ~14 hardcoded white-text declarations converted to the dynamic token (excluding `.rank-badge`'s fixed medal colors, and re-fixing the gold/pink avatars and Danger button back to fixed white); new swatch-picker CSS replacing the dead theme-selector rules.
+- `src/js/config/accentColorConfig.js` (new), `src/js/services/accentColorService.js` (new), `src/js/services/accentColorPreferenceService.js` (new).
+- `src/js/repositories/classroomRepository.js`, `firestoreClassroomRepository.js` — new accent-color methods added.
+- `src/js/ui/components/UserBar.js` — rewritten with the swatch picker.
+- `src/js/main.js` — accent color state, load-on-sign-in, reset-on-sign-out, and the selection handler wired in, mirroring the retired theme-selector's exact structure.
+
+### Breaking Changes
+None. Classic (the current flat blue) is the default for every existing and new user; nothing changes for a teacher who never opens the picker.
+
+### Regression Verification
+Computed-style checks confirmed: 5 swatches render with Classic active by default; selecting Ocean correctly renders `#5ea6da` with dark ink text; selecting Plum correctly renders `#6b4fa8` with white text; the KPI card and Class Mode's header/Undo button all correctly follow the choice; a teacher's chosen color persists correctly across sign-out and sign-back-in. A full regression pass (Settings, Notebook Register, Class Mode with Undo, Recognition Screen, cycling all 5 swatches) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Every one of the 5 color/text pairings was computed, not chosen by eye** — including the one the user explicitly requested, which genuinely fails with the "obvious" white-text choice. Honoring the requested color faithfully meant computing the *right* text color for it, not silently darkening the color itself to fit an assumed white-text default.
+- **Two related bugs (the hardcoded hex, the wrongly-inherited text color) were both found by testing the actual rendered page after each change**, not by re-reading the CSS and assuming it was correct — the same discipline this project has applied to every contrast decision, now applied to functional correctness too.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Ocean as Default (Contrast Check Overridden by Explicit Instruction), Full-Spectrum Custom Picker
+
+**Context:** explicit instruction to make Ocean (`#5ea6da`) the default with white text — overriding the contrast check this project has otherwise held as a hard floor — plus a request for a full-spectrum color picker so a teacher isn't limited to the 5 presets.
+
+### The contrast override, done transparently, not silently
+White text on `#5ea6da` measures 2.64:1, below the standard 4.5:1 (and below the large-text 3:1 exception for most of this screen's text). This was flagged plainly once, at the point it was requested, then implemented exactly as instructed — this is the product's own accessibility trade-off to make on its own app, not something to keep re-litigating turn after turn. `accentColorConfig.js`'s comment on the Ocean option documents this as a deliberate, named override, not a silently-lowered bar or an oversight a future reader might mistake for a bug.
+
+### Features Added
+- **Ocean is now `DEFAULT_ACCENT_COLOR_ID`**, with `textColor: '#ffffff'` set explicitly rather than computed — every other preset's pairing is still a genuine, verified contrast fact, unchanged from the prior phase.
+- **A full-spectrum custom color picker** (a native `<input type="color">`) added alongside the 5 preset swatches in `UserBar.js` — lets a teacher pick literally any color, not just the 5 offered.
+- **`accentColorService.pickReadableTextColor()`** — since a custom color can be anything, there's no way to pre-verify a pairing for it the way the 5 presets were. This computes relative luminance and picks whichever of white/dark-ink has the higher contrast ratio against that specific background — WCAG's own formula, used to *choose* automatically rather than to verify one fixed choice. Not a guarantee of clearing 4.5:1 for every conceivable color (a genuinely mid-toned pick could still fall short either way), but it's the better of the two options for whatever's chosen, verified with both a light (`#2ecc71`) and a very dark (`#1a0a3d`) test color landing on the correct side each time.
+- **Preference storage widened to hold either a preset id or a raw hex** — `main.js` now checks whether a stored value starts with `#` to decide whether to call the preset-lookup apply function (which uses each option's authored, possibly-overridden text color) or the custom apply function (which always computes). Confirmed via direct testing that a custom color persists correctly across sign-out and sign-back-in, is correctly detected as custom (not matched against a preset) on reload, and is correctly marked as the active swatch.
+
+### Files Modified
+- `src/js/config/accentColorConfig.js` — Ocean's `textColor`/default status changed; doc comments updated to accurately describe the override as deliberate, not computed.
+- `src/js/services/accentColorService.js` — added `pickReadableTextColor()` and `applyCustomAccentColor()`.
+- `src/js/ui/components/UserBar.js` — spectrum `<input type="color">` added alongside the presets; active-state detection now checks for a `#`-prefixed value.
+- `src/js/main.js` — new `handleSelectCustomAccentColor()`; sign-in load logic now branches on preset-id vs. raw-hex; sign-out reset changed from Classic to Ocean.
+- `src/css/styles.css` — native color-input swatch styled to match the plain circular preset buttons (stripping the browser's own inner swatch border/wrapper padding).
+
+### Breaking Changes
+None for existing users on a preset — Classic-preference users are unaffected; only the *default* for someone who has never chosen anything changes, from Classic to Ocean, per this instruction.
+
+### Regression Verification
+Computed-style checks confirmed: Ocean is the default swatch and renders exactly `#5ea6da` with white text; the custom picker correctly applies an arbitrary hex and auto-selects dark text for a light custom color and white text for a very dark one; a custom color survives sign-out/sign-in and is correctly re-marked as active. A full regression pass (Settings, Notebook Register, Class Mode with Undo, Recognition Screen, cycling all 5 presets) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The override was scoped as narrowly as the instruction itself** — only Ocean's specific pairing was changed; the other four presets' verified contrast pairings, and the whole rest of the contrast-checking discipline this project has used throughout, are unchanged. An explicit, narrow override is not treated as license to relax rigor everywhere else.
+- **The custom picker uses a computed fallback (luminance-based auto-selection) rather than another hardcoded override**, since — unlike the 5 named presets — there's no way to know in advance what a teacher will pick from an open spectrum. This is a meaningfully different situation from Ocean's override: Ocean is one specific, known, explicitly-instructed color; a custom pick is unbounded, so the responsible default there is "compute the better of the two options," not "assume white always works."
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Accent Color Picker Tucked Behind an Edit Button
+
+**Context:** the 6 always-visible swatches (5 presets + spectrum picker) in the top bar were cluttering the chrome — replaced with a single compact "✏️ Edit" button showing the current color, opening a small anchored popover with the same options rather than a permanent row.
+
+### Features Added
+- **A single Edit button** replaces the always-visible row — shows a small swatch of the currently active color plus a pencil icon, so a teacher can see what's active without the popover being open.
+- **A small anchored popover**, not this app's existing full-screen bottom-sheet pattern (`QuickActionsSheet.js`) — that pattern is appropriate for a major action sheet, disproportionate for a small settings tweak like a color choice. The popover opens below the Edit button, closes automatically after a selection is made, and closes on an outside click.
+- **The active-swatch ring color was fixed for its new context**: it used to be a white ring, correct against the dark chrome bar it sat directly on; now that swatches live inside a white popover panel, a white ring would be invisible against a white background. Changed to a dark ink ring, verified visible in the actual rendered popover.
+
+### Files Modified
+- `src/js/ui/components/UserBar.js` — rewritten around the Edit button + popover structure; popover open/close handled via plain DOM class toggling (the same technique `PendingTasksWidget.js` already uses for its own expand/collapse), not a full re-render.
+- `src/css/styles.css` — `.user-bar__color-picker` (the old always-visible row) replaced with `.user-bar__color-editor`/`.user-bar__color-edit-button`/`.user-bar__color-popover`; the active-swatch ring color fixed for its new white-background context.
+
+### Breaking Changes
+None. Every existing preset and the spectrum picker are still available, just one click away instead of always visible; the persistence/apply logic in `main.js` is completely unchanged.
+
+### Regression Verification
+Computed-style checks confirmed: the popover is hidden by default, opens on clicking Edit, closes after selecting a color, closes on an outside click, and the Edit button's own swatch correctly reflects whatever color is active. A full regression pass (Settings, Class Mode, selecting a color after navigating to a different page, Recognition Screen) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Reused this app's existing "local DOM toggle, no full re-render" pattern** for the popover's open/close state (the same technique already established in `PendingTasksWidget.js`), rather than introducing a new one — keeping the number of different interaction idioms in this codebase from growing for something that didn't need a new one.
+- **Deliberately did not reach for the existing bottom-sheet component**, even though it was the closest existing "reveal more options" pattern in the app — a full-screen dimming overlay is proportionate for Quick Actions (a multi-step, consequential set of choices) but would feel heavy-handed for picking a color, so a small anchored popover was built instead.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Real Spectrum/Gradient Picker, Icon-Only Edit Button, Icon Buttons in Class Mode
+
+**Context:** clarification via a reference image that "spectrum color picker" meant an actual inline 2D gradient square with a marker dot — not the browser's native OS color dialog `<input type="color">` opens. Also: the Edit control moved to be icon-only, grouped with Sign Out; and icons added to Class Mode's header action buttons, per a second reference image.
+
+### Features Added
+- **`SpectrumColorPicker.js`** (new) — a real HSV gradient square (hue-tinted background, white-to-transparent and black-to-transparent CSS gradients layered for the saturation/value axes) with a draggable marker dot, plus a separate hue strip below it. Built with Pointer Events, matching the same drag pattern already established in `ClassModeStudentRow.js` — not a new interaction idiom for this codebase.
+- **The Edit control is now icon-only** (a small current-color swatch + pencil, no "Edit" text) and grouped directly beside Sign Out, rather than floating in the middle of the bar.
+- **Icons added to Class Mode's header buttons** (Undo, Reset Session, Learning Activities, Notebook Tracker, Settings) — icon + label, not icon-only, since several of these (Learning Activities, Notebook Tracker) don't have a single universally-recognized symbol the way Settings' gear does.
+
+### A real bug found through testing, not assumed away
+Wiring the spectrum picker's continuous `onChange` (fires on every pointermove during a drag) straight to the existing full-commit handler meant every pixel of drag movement triggered a complete `renderUserBar()` re-render — tearing down and rebuilding the very DOM element being dragged, mid-drag, while also writing to Firestore on every single pointer movement. Caught by actually simulating a multi-step drag in a real browser and checking the element's bounding box afterward (it came back `null` — the element had been silently replaced), not by re-reading the code and assuming the wiring was fine.
+
+**Fixed with a three-way split**, all threaded through `main.js` (keeping `UserBar.js` "rendering only," per its own architecture):
+- `onChange` (every pointermove) → a lightweight preview: applies the three CSS custom properties directly, no persistence, no re-render.
+- `onChangeComplete` (pointer release) → persists to Firestore and updates tracked state, but **also** deliberately skips re-rendering — a second issue found in the same pass: re-rendering here would reset the popover back to closed after every single hue adjustment, making it impossible to then click the saturation/value square without reopening the popover each time. A preset swatch click (a deliberate, one-shot choice) still closes the popover; a spectrum drag-release does not.
+- Preset clicks → unchanged, full commit + close, since a discrete choice closing the panel is the expected, correct behavior there.
+
+### Files Modified
+- `src/js/ui/components/SpectrumColorPicker.js` (new) — the gradient square + hue slider component, with `onChange`/`onChangeComplete` split from the start once the bug above was found.
+- `src/js/ui/components/UserBar.js` — icon-only edit button; grouped with Sign Out via a new `.user-bar__right-group` wrapper; swaps the native color input for the real spectrum picker.
+- `src/js/main.js` — three distinct handlers now exist for the spectrum picker specifically (preview / commit-without-rerender), alongside the unchanged preset-selection handler.
+- `src/css/styles.css` — `.user-bar__right-group`, icon-only button sizing, `.spectrum-picker`/`__square`/`__marker`/`__hue-slider`/`__hue-handle` all added; the now-unused native-color-input styling removed.
+- `src/js/ui/views/TrackerView.js` — icons added to all 5 header action buttons' text.
+
+### Breaking Changes
+None. Presets, persistence, and every existing color still work exactly as before — this phase changed the picker's visual mechanism and the button layout, not the underlying preference model.
+
+### Regression Verification
+A full multi-step drag (5 intermediate pointer positions, not just down+up) was simulated on the hue slider specifically because that's where the bug lived — confirmed the square element survives with a valid bounding box afterward, the popover stays open through both a hue adjustment and a subsequent square click, and only closes on a preset click or an outside click. Icon buttons confirmed present via their actual text content in Class Mode. A full regression pass (Settings, Class Mode with Undo, Recognition Screen) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The preview/commit split was discovered by testing, then designed properly**, not patched around — rather than debounce the existing single handler (which would have been a band-aid papering over the real issue of mixing "continuous preview" and "discrete commit" into one function), the fix cleanly separated the two concerns the way this app's Progress Engine and repository layers already separate read-only computation from I/O.
+- **Icon+text was chosen over icon-only for the header action buttons**, unlike the Edit button, because several of these actions (Learning Activities, Notebook Tracker) don't have one universally recognized symbol the way "edit" (pencil) or "settings" (gear) do — icon-only there would trade real clarity for a small space saving that wasn't asked for in that case.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Class Mode Header Buttons — Icon-Only, Correcting the Prior Icon+Text Pass
+
+**Context:** direct correction against a screenshot — the previous phase added icon+text to Class Mode's 5 header buttons, reasoning that some of the actions lacked a single obvious symbol; explicit direction was icon-only all along ("keep it clean by replacing text with icons").
+
+### Features Added
+- **All 5 header buttons** (Undo, Reset Session, Learning Activities, Notebook Tracker, Settings) are now icon-only — no visible text.
+- **Accessibility preserved despite the visual text removal**: each button carries an `aria-label` with the full original meaning ("Undo last action," "Reset session," etc.) plus a `title` attribute for a hover tooltip, so a screen reader user or a sighted user unsure of a glyph both still get the same information the text used to provide.
+- **New `.btn--icon-only` CSS** — a square, centered sizing variant, since the previous button padding was designed around text width.
+
+### Files Modified
+- `src/js/ui/views/TrackerView.js` — all 5 buttons' visible text removed; `aria-label`/`title` added to each.
+- `src/css/styles.css` — `.btn--icon-only` added.
+
+### Breaking Changes
+None. Every button's click handler, disabled state, and destination are unchanged — this was a visual/accessibility-attribute change only.
+
+### Regression Verification
+Confirmed via computed text content that each button shows only its glyph, and via `aria-label` that its full meaning is still attached. Confirmed Undo's disabled state still correctly toggles (disabled with no actions to undo, enabled after awarding a star), and that Settings/Learning Activities/Notebook Tracker's icon-only buttons still navigate to the correct screen. A full regression pass confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The previous phase's icon+text reasoning was overridden by explicit, direct instruction, not re-litigated** — that reasoning (some actions lack one obvious symbol) was a real consideration worth raising once, but a clear, repeated instruction settles the question; this entry implements it plainly rather than re-arguing a point already decided.
+- **Accessibility was treated as non-negotiable independent of the visual choice** — going icon-only is a legitimate design decision, but it doesn't get to quietly drop what a screen reader announces; `aria-label` carries the exact meaning the removed text used to.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Notebook Register: Dropdowns Instead of Button Rows; Timeline: Weekly Default with a Toggle
+
+**Context:** two distinct, real usability concerns raised together against screenshots — the Register View's 7 buttons per student row (3 Submission + 4 Completion) would only get more overwhelming as more status options are added; and the Timeline View defaulted to a full month of dots, when a weekly view is the more common "how's this week going" question.
+
+### Features Added — Notebook Register
+- **`NotebookRoster.js`'s two toggle-button groups replaced with two compact `<select>` dropdowns** (Submission, Completion) per student row. The specific problem named — "especially when more notes are added it will be too overwhelming" — is exactly what a dropdown solves structurally: a button row's width grows with every new option added to the vocabulary; a select's width doesn't change no matter how many options it holds. Confirmed `.toggle-group`/`.toggle-group__button` CSS is still used elsewhere (Recognition Screen's period tabs) before touching anything, so nothing there was disturbed.
+- Each dropdown keeps a neutral placeholder ("Not marked" / "Not assessed") for the unset state, preserving the existing semantics (no submission/completion recorded yet) rather than defaulting to a specific status.
+
+### Features Added — Notebook Timeline
+- **Defaults to the current week** (Monday-start, via the already-existing `dateHelpers.getWeekRange()`) instead of the current month.
+- **A Weekly/Monthly toggle** added to the header, using the same `toggle-group` pattern as the Recognition Screen's period tabs — switching modes preserves the current reference date, recomputing the shown range around it.
+- Week mode navigates by ±7 days; month mode's existing navigation is unchanged in behavior, just re-expressed through the view's own local state instead of the router.
+
+### Files Modified
+- `src/js/ui/components/NotebookRoster.js` — `createToggleGroup()` replaced with `createStatusSelect()`.
+- `src/js/ui/views/NotebookTimelineView.js` — rewritten around a local `rerender()` closure (the same pattern `TrackerView.js` already uses for Class Mode) tracking `viewMode` and a `referenceDateKey`, replacing the previous router-driven `yearMonth`/`onNavigateMonth` design.
+- `src/js/main.js` — Timeline route wiring simplified accordingly; `yearMonth`/`onNavigateMonth` props removed since the view now manages this state itself.
+- `src/css/styles.css` — `.notebook-status-select`/`__label`/`__input` added for the new dropdowns.
+
+### Breaking Changes
+None functionally — every status value, save call, and derived symbol is unchanged; this is an interaction/UI change on top of the same data model. One disclosed trade-off: Timeline's current week/month position is no longer reflected in the URL (previously the month was, via `route.yearMonth`), so it won't survive a page reload or be a shareable link the way it briefly did. Given this is a read-only history view, not a core workflow, this was judged an acceptable trade for the simpler, more consistent local-state model — flagged here rather than left undocumented.
+
+### Regression Verification
+Confirmed via `selectOption()` that both dropdowns correctly update their value and persist through a save/rerender cycle. Confirmed the Timeline defaults to "Weekly" with exactly 7 day-symbol elements (not a full month), that the Weekly/Monthly toggle correctly switches the active state, and that navigation (previous/next week, previous/next month) produces correctly-formatted labels in both modes ("13 Jul 2026 – 19 Jul 2026" for a week; "July 2026" / "June 2026" for a month). A full regression pass (Settings, notebook marking via the new dropdowns, day navigation, week navigation, mode switching, month navigation, returning to Register) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The dropdown redesign targeted the actual structural problem named** ("more notes... more overwhelming") rather than just making the existing buttons smaller or wrapping them differently — a layout tweak wouldn't have solved the real issue, which is that a button-per-option pattern doesn't scale, no matter how tightly it's packed.
+- **Timeline's view-state was moved off the router deliberately, not by default** — the Register View's date stays on the router (a teacher plausibly wants to link to or reload a specific day's marking screen); the Timeline is read-only history, where exactly which week is showing has much less need to survive a reload, making the simpler local-state model (matching Class Mode's own established pattern) the better fit rather than a compromise.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.

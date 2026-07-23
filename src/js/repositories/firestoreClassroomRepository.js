@@ -203,6 +203,15 @@ class FirestoreClassroomRepository extends ClassroomRepository {
   async setThemePreference(uid, theme) {
     await setDoc(this._userDoc(uid), { theme }, { merge: true });
   }
+
+  async getAccentColorPreferenceOnce(uid) {
+    const docSnapshot = await getDoc(this._userDoc(uid));
+    return docSnapshot.exists() ? docSnapshot.data().accentColor || null : null;
+  }
+
+  async setAccentColorPreference(uid, colorId) {
+    await setDoc(this._userDoc(uid), { accentColor: colorId }, { merge: true });
+  }
 }
 
 export const firestoreClassroomRepository = new FirestoreClassroomRepository();

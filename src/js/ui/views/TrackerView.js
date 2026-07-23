@@ -72,8 +72,10 @@ export function renderTrackerView(container, props) {
 
   const undoButton = document.createElement('button');
   undoButton.type = 'button';
-  undoButton.className = 'btn btn--ghost';
-  undoButton.textContent = 'Undo';
+  undoButton.className = 'btn btn--ghost btn--icon-only';
+  undoButton.textContent = '\u21a9\ufe0f';
+  undoButton.setAttribute('aria-label', 'Undo last action');
+  undoButton.title = 'Undo';
   undoButton.disabled = !classModeService.canUndo(classroom);
   undoButton.addEventListener('click', () => {
     const undone = classModeService.undo(classroom);
@@ -86,8 +88,10 @@ export function renderTrackerView(container, props) {
 
   const resetButton = document.createElement('button');
   resetButton.type = 'button';
-  resetButton.className = 'btn btn--danger';
-  resetButton.textContent = 'Reset Session';
+  resetButton.className = 'btn btn--danger btn--icon-only';
+  resetButton.textContent = '\ud83d\udd04';
+  resetButton.setAttribute('aria-label', 'Reset session');
+  resetButton.title = 'Reset Session';
   resetButton.disabled = !hasStudents;
   resetButton.addEventListener('click', () => {
     const confirmed = window.confirm(
@@ -103,20 +107,26 @@ export function renderTrackerView(container, props) {
 
   const settingsButton = document.createElement('button');
   settingsButton.type = 'button';
-  settingsButton.className = 'btn btn--ghost';
-  settingsButton.textContent = 'Settings';
+  settingsButton.className = 'btn btn--ghost btn--icon-only';
+  settingsButton.textContent = '\u2699\ufe0f';
+  settingsButton.setAttribute('aria-label', 'Settings');
+  settingsButton.title = 'Settings';
   settingsButton.addEventListener('click', onSettings);
 
   const activitiesButton = document.createElement('button');
   activitiesButton.type = 'button';
-  activitiesButton.className = 'btn btn--ghost';
-  activitiesButton.textContent = 'Learning Activities';
+  activitiesButton.className = 'btn btn--ghost btn--icon-only';
+  activitiesButton.textContent = '\ud83d\udcda';
+  activitiesButton.setAttribute('aria-label', 'Learning Activities');
+  activitiesButton.title = 'Learning Activities';
   activitiesButton.addEventListener('click', onActivities);
 
   const notebooksButton = document.createElement('button');
   notebooksButton.type = 'button';
-  notebooksButton.className = 'btn btn--ghost';
-  notebooksButton.textContent = 'Notebook Tracker';
+  notebooksButton.className = 'btn btn--ghost btn--icon-only';
+  notebooksButton.textContent = '\ud83d\udcd2';
+  notebooksButton.setAttribute('aria-label', 'Notebook Tracker');
+  notebooksButton.title = 'Notebook Tracker';
   notebooksButton.addEventListener('click', onNotebooks);
 
   actions.append(undoButton, resetButton, activitiesButton, notebooksButton, settingsButton);
