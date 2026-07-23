@@ -15,7 +15,7 @@ import {
   getDisplaySubtitle,
 } from '../../services/classroomService.js';
 
-export function renderHomeView(container, { classrooms, onSelectClassroom, onNewClassroom }) {
+export function renderHomeView(container, { classrooms, onSelectClassroom, onNewClassroom, onJoinClassroom }) {
   container.innerHTML = '';
 
   const wrapper = document.createElement('div');
@@ -28,13 +28,23 @@ export function renderHomeView(container, { classrooms, onSelectClassroom, onNew
   title.className = 'home-view__title';
   title.textContent = 'My Classrooms';
 
+  const actions = document.createElement('div');
+  actions.className = 'home-view__actions';
+
+  const joinButton = document.createElement('button');
+  joinButton.type = 'button';
+  joinButton.className = 'btn btn--ghost';
+  joinButton.textContent = 'Join a Classroom';
+  joinButton.addEventListener('click', onJoinClassroom);
+
   const newButton = document.createElement('button');
   newButton.type = 'button';
   newButton.className = 'btn btn--primary';
   newButton.textContent = '+ New Classroom';
   newButton.addEventListener('click', onNewClassroom);
 
-  header.append(title, newButton);
+  actions.append(joinButton, newButton);
+  header.append(title, actions);
 
   const grid = document.createElement('div');
   grid.className = 'classroom-grid';

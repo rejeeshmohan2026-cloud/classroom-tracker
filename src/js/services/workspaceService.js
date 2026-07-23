@@ -223,3 +223,45 @@ export function deleteClassroom(id) {
 export function save(classroom) {
   persistClassroom(classroom);
 }
+
+/** Fire-and-forget, matching save()'s pattern — called once, alongside saving a classroom that just generated a new join code (see classroomService.ensureJoinCode()). */
+export function createJoinCodeMapping(code, classroomId) {
+  repository.createJoinCodeMapping(code, classroomId).catch((error) => {
+    console.error('[workspaceService] Failed to create join code mapping:', error);
+  });
+}
+
+/**
+ * The "Join a Classroom" action a co-teacher uses, from their own
+ * account, instead of an email-based invite (this app has no way to
+ * look up another account by email). Resolves the code to a
+ * classroom, then adds the caller as a teacher member via a narrow,
+ * additive-only write — see firestoreClassroomRepository.js's
+ * addSelfAsTeacher() for why that shape matters for the security rule
+ * it needs.
+ *
+ * The newly-joined classroom does not need to be added to local state
+ * here: addSelfAsTeacher() writes to this uid's own classroomRefs,
+ * which the existing subscribeToClassroomRefs() listener (see
+ * initForUser() above) already reacts to — the same mechanism that
+ * already makes a newly-created classroom appear on Home.
+ */
+export async function joinClassroomByCode(code, uid, displayName) {
+  const normalizedCode = code.trim().toUpperCase();
+  if (!normalizedCode) {
+    return { success: false, reason: 'empty' };
+  }
+
+  const classroomId = await repository.getClassroomIdByJoinCode(normalizedCode);
+  if (!classroomId) {
+    return { success: false, reason: 'not_found' };
+  }
+
+  await repository.addSelfAsTeacher(classroomId, uid, {
+    role: MEMBER_ROLES.TEACHER,
+    displayName: displayName || 'Teacher',
+    joinedAt: new Date().toISOString(),
+  });
+
+  return { success: true, classroomId };
+}

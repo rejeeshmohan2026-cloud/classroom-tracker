@@ -11,21 +11,27 @@
  * Real, Google-authenticated membership now exists (see
  * services/memberService.js and models/Classroom.js's `members` map) —
  * the Teachers tab shows the actual Owner and Teachers on this shared
- * classroom, and "+ Invite Teacher" is a visible-to-owner-only
- * placeholder for now (invitations are a later phase). Permissions is
- * still a static reference table, but the role matrix it displays is now
- * the real one enforced (client-side) elsewhere — e.g. Danger Zone below
- * only lets the owner delete the classroom.
+ * classroom, and its owner-only "Classroom ID" section is the real
+ * co-teacher joining mechanism: a shared code (see
+ * classroomService.ensureJoinCode()), not an email-based invite (this
+ * app has no way to look up another account by email — see
+ * authService.js's own module comment). Permissions is still a static
+ * reference table, but the role matrix it displays is now the real one
+ * enforced (client-side) elsewhere — e.g. Danger Zone below only lets
+ * the owner delete the classroom.
  */
 
 import * as teamService from '../../services/teamService.js';
 import * as studentService from '../../services/studentService.js';
+import * as notebookService from '../../services/notebookService.js';
+import * as classModeService from '../../services/classModeService.js';
 import * as memberService from '../../services/memberService.js';
 import * as workspaceService from '../../services/workspaceService.js';
 import * as setupProgressService from '../../services/setupProgressService.js';
 import * as notebookConfigService from '../../services/notebookConfigService.js';
-import { getDisplayName, ClassroomValidationError } from '../../services/classroomService.js';
+import { getDisplayName, ClassroomValidationError, ensureJoinCode } from '../../services/classroomService.js';
 import { MEMBER_ROLES, PERMISSIONS, ROLE_PERMISSIONS } from '../../config/memberRoles.js';
+import { showToast } from '../components/Toast.js';
 
 const SECTIONS = ['general', 'students', 'groups', 'notebooks', 'teachers', 'permissions', 'danger'];
 const SECTION_LABELS = {
@@ -526,26 +532,59 @@ function renderTeachersSection(content, classroom, rerender, currentUser) {
     section.appendChild(teachersList);
   }
 
-  // Invitations are a later phase — this is a visible-to-owner-only
-  // placeholder so the structure (and the button teachers will expect
-  // to find) is already in place.
+  // The join code IS the invitation mechanism — a co-teacher, signed
+  // into their own account, enters this code from their own Home
+  // screen ("Join a Classroom") to add themselves as a teacher member.
+  // No email lookup is involved (this app has no way to find another
+  // account by email — see authService.js), and no separate invite
+  // record is needed: the code itself is the whole mechanism.
   if (isOwner) {
-    const inviteButton = document.createElement('button');
-    inviteButton.type = 'button';
-    inviteButton.className = 'btn btn--ghost';
-    inviteButton.textContent = '+ Invite Teacher';
-    inviteButton.disabled = true;
-    inviteButton.title = 'Coming soon';
-    inviteButton.addEventListener('click', () => {
-      window.alert('Inviting teachers is coming in a future update.');
-    });
-    section.appendChild(inviteButton);
+    const generatedNewCode = ensureJoinCode(classroom);
+    if (generatedNewCode) {
+      workspaceService.save(classroom);
+      workspaceService.createJoinCodeMapping(classroom.classroomJoinCode, classroom.id);
+    }
 
-    const note = document.createElement('p');
-    note.className = 'settings-section__meta';
-    note.textContent = 'Invitations are coming soon \u2014 only you can see this button.';
-    section.appendChild(note);
+    const joinCodeHeading = document.createElement('h3');
+    joinCodeHeading.className = 'settings-team-block__heading';
+    joinCodeHeading.textContent = 'Classroom ID';
+    section.appendChild(joinCodeHeading);
+
+    const joinCodeNote = document.createElement('p');
+    joinCodeNote.className = 'settings-section__meta';
+    joinCodeNote.textContent =
+      'Share this code with a co-teacher so they can join this classroom from their own account \u2014 they\u2019ll enter it from "Join a Classroom" on their Home screen.';
+    section.appendChild(joinCodeNote);
+
+    const joinCodeRow = document.createElement('div');
+    joinCodeRow.className = 'join-code-display';
+
+    const joinCodeValue = document.createElement('span');
+    joinCodeValue.className = 'join-code-display__value';
+    joinCodeValue.textContent = classroom.classroomJoinCode;
+    joinCodeRow.appendChild(joinCodeValue);
+
+    const copyButton = document.createElement('button');
+    copyButton.type = 'button';
+    copyButton.className = 'btn btn--ghost';
+    copyButton.textContent = 'Copy';
+    copyButton.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(classroom.classroomJoinCode);
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = 'Copy';
+        }, 1500);
+      } catch (error) {
+        console.error('[SettingsView] Failed to copy join code:', error);
+        window.alert(`Classroom ID: ${classroom.classroomJoinCode}`);
+      }
+    });
+    joinCodeRow.appendChild(copyButton);
+
+    section.appendChild(joinCodeRow);
   }
+
 
   content.appendChild(section);
 }
@@ -636,7 +675,31 @@ function renderDangerSection(content, classroom, currentUser, onDeleted) {
     onDeleted();
   });
 
-  section.append(warning, deleteButton);
+  const resetDivider = document.createElement('hr');
+  resetDivider.className = 'settings-section__divider';
+
+  const resetWarning = document.createElement('p');
+  resetWarning.className = 'settings-section__meta';
+  resetWarning.textContent =
+    'Reset all classroom data to start completely from zero: every student\u2019s score, stars, streaks, badges, notes, bucket assignment, Learning Activity status, and the entire notebook check-in history for every subject. This is different from Reset Session in Class Mode, which only zeroes the current score — Recognition Wall, streaks, and Weekly Snapshot are computed from history this does clear. Groups, students, subjects, and Learning Activity definitions are kept; only accumulated data is removed. This cannot be undone.';
+
+  const resetButton = document.createElement('button');
+  resetButton.type = 'button';
+  resetButton.className = 'btn btn--danger';
+  resetButton.textContent = 'Reset all classroom data';
+  resetButton.addEventListener('click', () => {
+    const confirmed = window.confirm(
+      `Reset ALL data for "${getDisplayName(classroom)}"? This clears every student's score, streaks, badges, notes, bucket, activity status, and the full notebook history. Groups and students themselves are kept. This cannot be undone.`
+    );
+    if (!confirmed) return;
+    studentService.resetAllStudentData(classroom);
+    notebookService.clearAllNotebookData(classroom);
+    classModeService.clearUndoStack(classroom);
+    workspaceService.save(classroom);
+    showToast('Classroom data reset');
+  });
+
+  section.append(warning, deleteButton, resetDivider, resetWarning, resetButton);
   content.appendChild(section);
 }
 

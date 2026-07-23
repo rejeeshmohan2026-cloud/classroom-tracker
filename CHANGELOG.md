@@ -1016,3 +1016,172 @@ Confirmed via `selectOption()` that both dropdowns correctly update their value 
 
 ### Future TODOs
 - (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## New Feature: Reset All Classroom Data (a Real Gap Closed)
+
+**Context:** direct question — is there a way to fully reset a classroom back to zero? The existing "Reset Session" button (Class Mode) only zeroes `student.score`; Recognition Wall, streaks, and Weekly Snapshot are computed from `student.history` and `classroom.notebooks`, neither of which Reset Session touches — so old test data kept surfacing there even after a "reset." Confirmed this gap directly in the code (`studentService.resetAllScores` — a 3-line function that only sets `score = 0`) before building anything, rather than assuming what the existing button did.
+
+### Features Added
+- **`studentService.resetAllStudentData(classroom)`** (new) — clears `score`, `bucket`, `badges`, `notes`, `submissions`, and `history` for every student. `history` is the important one: it's the append-only log Recognition Wall/streaks/Weekly Snapshot are actually computed from (see `studentProgressService.js`) — clearing only `score`, as the existing action does, leaves all of that still reading stale data. Bucket assignment is included too, since it was named explicitly ("I randomly checked a lot of things") as part of what should go back to zero.
+- **`notebookService.clearAllNotebookData(classroom)`** (new) — clears the entire day-by-day notebook register (`classroom.notebooks = {}`) across every subject and notebook type.
+- **A new "Reset all classroom data" button in Settings → Danger Zone**, alongside the existing "Delete classroom" — same owner-only restriction, same `window.confirm()` pattern for consistency, but with its own warning text explaining specifically what gets cleared and, just as importantly, what's kept (groups, students, subjects, and Learning Activity definitions all survive — only accumulated data is removed).
+
+### Files Modified
+- `src/js/services/studentService.js` — `resetAllStudentData()` added alongside the existing `resetAllScores()` (kept, still used by Class Mode's "Reset Session" — the two serve genuinely different scopes, not one replacing the other).
+- `src/js/services/notebookService.js` — `clearAllNotebookData()` added.
+- `src/js/ui/views/SettingsView.js` — Danger Zone extended with the new action, its own confirmation dialog, and a divider separating it from Delete Classroom.
+- `src/css/styles.css` — `.settings-section__divider` added.
+
+### Breaking Changes
+None. This is a new, opt-in destructive action a teacher has to deliberately find and confirm — it doesn't change what any existing button does. "Reset Session" (Class Mode) is unchanged and still serves its original, narrower purpose (a fresh session mid-lesson, keeping badges/notes/history intact).
+
+### Regression Verification
+Built up real data first (awarded stars via Class Mode, marked a notebook entry) and confirmed Weekly Snapshot's KPI card showed the real count (5) before resetting — then confirmed after resetting that the KPI card disappears entirely (an empty state renders instead) and Recognition Wall correctly shows its "just getting started" empty state, proving this actually closes the gap that was reported, not just clearing a number. Also confirmed — after an initial test check gave a false-positive "student deleted" result — that this was a flawed test selector (`textContent` doesn't see a value inside an `<input>`), not a real bug: properly checking the input's `.value` property confirmed both the student and group survive the reset intact. A full regression pass (Settings, notebook marking, Class Mode scoring, the reset itself, then re-confirming the notebook entry and score are both cleared afterward) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **A test failure was investigated rather than trusted at face value** — the first check reported the student was gone after resetting, which would have been a serious bug if true. Instead of either shipping with that unresolved or silently "fixing" the reset function based on a possibly-wrong signal, the actual page HTML was inspected, the real reason found (an input's value isn't part of `textContent`), and the check redone correctly before concluding the reset genuinely preserves classroom structure.
+- **`resetAllScores` was kept, not replaced** — Class Mode's "Reset Session" and Settings' new "Reset all classroom data" are answering two different questions ("fresh session, same lesson" vs. "wipe this classroom's whole history"), so keeping both as distinctly-scoped actions is more correct than collapsing them into one, even though they now share some behavior.
+
+### Future TODOs
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Bloom Labs Platform Entry Point — Landing Page + Student Portal Placeholder
+
+**Context:** Classroom Tracker is becoming one product under a new parent platform, Bloom Labs (alongside a future Student Portal and Learning Hub). First deliverable: a public landing page offering "Continue as Teacher" / "Continue as Student," in front of the existing app — not a rewrite, not a role-based auto-router yet (that's explicitly future work), just the entry point.
+
+### Architecture review, done before writing any code
+`router.js` had exactly one catch-all route (`{ name: 'home' }`) for anything outside `classroom/{id}/...`. `main.js`'s `renderRoute()` ran one universal check before anything else — `if (!currentUser) → show LoginView` — which is why every visitor previously landed on the Google sign-in screen regardless of URL; there was no pre-auth gate of any kind. This was confirmed by reading the actual code, not assumed.
+
+### The approach taken, and why
+- **The `classroom/{id}/...` parsing block was not touched at all** — it's already unambiguous and self-contained, so there was no reason to go near it, and zero regression risk to existing Classroom Tracker routes as a result.
+- **The bare root (`#/`) now means the Bloom Labs landing page**; the existing teacher home/welcome flow was given its own explicit address, `#/teacher`, with its internal behavior completely unchanged. A new `#/student` route was added for the placeholder.
+- **The auth gate moved one level down**: `landing` and `studentPlaceholder` render before `renderRoute`'s `if (!currentUser)` check — they're pre-auth, platform-level screens, not part of Classroom Tracker's own flow. Everything else (`/teacher` and every `/classroom/...` route) keeps the exact same auth gate it had before.
+- **Two pre-existing internal fallbacks were updated** — `router.navigate('/')` (classroom-not-found; classroom-deleted) now goes to `/teacher` instead. Now that bare `/` means the platform landing page, leaving these as `/` would have bounced a teacher hitting a stale link all the way out to the product picker instead of back into the app they were already using — a real, if small, regression this review specifically caught before it shipped.
+
+### Features Added
+- **`ui/views/LandingView.js`** (new) — the Bloom Labs product picker: two journey cards ("For Teachers" / "For Students"), each with a brief description matching the stated product philosophy ("How is my classroom doing?" vs. "How am I doing?") and a button. No auth check, no classroom awareness — this sits one layer above both.
+- **`ui/views/StudentPlaceholderView.js`** (new) — a deliberately minimal "Student Portal — Coming soon" screen with a link back to the landing page. Not a stub of the real Student Portal: per the stated product philosophy, the Student Portal will be its own experience, not a restricted view of Classroom Tracker, so there's nothing here worth reusing once that work actually starts.
+- **`router.js`** — three new top-level route names (`landing`, teacher's home reached via `/teacher`, `studentPlaceholder` via `/student`), added without touching the existing classroom-route parsing.
+- **`main.js`** — imports and wires the two new views; the two fallback navigations corrected.
+- **`styles.css`** — `.landing-view` and its journey-card styling added, reusing `.welcome-view`'s existing title/subtitle typography scale and the existing `.btn--primary`/color tokens rather than inventing a parallel system for what's structurally the same "centered title + subtitle" pattern.
+
+### Files Modified
+`src/js/ui/router.js`, `src/js/main.js`, `src/css/styles.css`. **Files created:** `src/js/ui/views/LandingView.js`, `src/js/ui/views/StudentPlaceholderView.js`. `index.html` needed no changes — the shell already just renders into `#app`/`#user-bar` based on route, which is exactly why this could be built additively.
+
+### Breaking Changes
+None to any existing Classroom Tracker functionality — verified directly, not assumed: a full regression pass after signing in through the new `/teacher` entry point exercised Settings (Groups/Students/Notebooks), notebook marking and Timeline, Class Mode (award + Undo), the Recognition Screen, the accent color picker, and the "Reset all classroom data" feature, all confirmed working exactly as before. Deep-linking directly to a classroom URL (bypassing the landing page and the `/teacher` address entirely) was also confirmed to still work, matching the router's own documented guarantee that deep links work on refresh.
+
+### Regression Verification
+Confirmed: the bare root shows the Bloom Labs landing page, not the login screen (a genuine, intentional behavior change from before, not a regression, since previously there was no landing page at all). Confirmed "Continue as Student" shows the placeholder with no auth prompt, and "Back to Bloom Labs" returns correctly. Confirmed "Continue as Teacher" leads to the *existing, unchanged* Google sign-in flow at `/teacher`. Confirmed a classroom created and used through this new entry point behaves identically to before across every major feature area, and that a direct deep link to `#/classroom/{id}` still bypasses the landing page entirely, exactly as it always has for any other route.
+
+### Future TODOs
+- Role-based routing (reading a Firestore `role` field to auto-route signed-in users, per the stated Authentication Vision) is explicitly out of scope for this phase — the landing page is a manual picker for now, not an automatic router.
+- The real Student Portal experience, and Learning Hub, remain unbuilt — this phase is only the platform-level entry point in front of Classroom Tracker.
+- (Carried over, unchanged): Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Google Account Chooser Fixed for Testing Both Modes
+
+**Context:** wanting to freely switch accounts to test the Teacher and Student journeys separately. Traced this to a specific, well-known Firebase Auth behavior rather than guessing at a broader fix.
+
+### The actual mechanism, found in the code
+`signInWithGoogle()` created a plain `new GoogleAuthProvider()` with no parameters. Without `prompt: 'select_account'`, `signInWithPopup` will often silently reuse whichever Google account the *browser* is already signed into, rather than showing the account chooser. This app's own `signOutUser()` correctly clears the Firebase/app-level session, but that's a separate thing from the browser's underlying Google session — so the next sign-in attempt could still silently reauthenticate as the same account instead of prompting, which is exactly the friction described.
+
+### Features Added
+- **`GoogleAuthProvider.setCustomParameters({ prompt: 'select_account' })`** added to `signInWithGoogle()` — the standard fix for this exact symptom. Every sign-in attempt now shows Google's account chooser, letting a different account be picked deliberately instead of one being assumed.
+
+### Files Modified
+- `src/js/services/authService.js` — one function changed, two lines added.
+
+### Breaking Changes
+None. Every existing sign-in still works the same way; the only difference is Google's account chooser now always appears, rather than sometimes being skipped.
+
+### A real testing limitation, disclosed rather than glossed over
+This project's entire test harness (every regression pass throughout this whole build) mocks `authService.js` out completely, since there's no real Firebase/Google credential available in this sandboxed environment. That means this specific change — whether Google's account chooser actually appears — could not be verified end-to-end here the way every other feature in this project has been. The fix itself is syntax-checked and is the standard, documented solution for this exact behavior, but genuine confirmation needs to happen with real Google accounts, which is on the person testing this, not something achievable in this environment.
+
+### Future TODOs
+- (Carried over, unchanged): Role-based routing; real Student Portal; Learning Hub; Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## In-App Link Back to Bloom Labs
+
+**Context:** a direct question — how to reach the Student placeholder while signed in as a teacher — surfaced a real gap: there was no in-app way to get back to the Bloom Labs landing page once inside the teacher app at all, only manual URL editing.
+
+### Features Added
+- **A small "← Bloom Labs" link** added to `UserBar.js`, next to Sign Out — present on every screen a teacher can reach, same as Sign Out itself. Pure navigation, no auth side effects: clicking it does not sign anyone out, so the teacher session survives the round trip to the landing page and back.
+
+### Files Modified
+- `src/js/ui/components/UserBar.js` — new link added to the button group, `onBackToLanding` added to the render function's props.
+- `src/js/main.js` — `onBackToLanding: () => router.navigate('/')` added to all three `renderUserBar()` call sites.
+
+### Breaking Changes
+None. Purely additive — every existing button, layout, and behavior in the UserBar is unchanged.
+
+### Regression Verification
+Confirmed the full round trip works from deep inside the app, not just from the teacher home screen: created a classroom, navigated into its dashboard, clicked "← Bloom Labs" from there, landed on the platform picker, went to the Student placeholder, came back, and chose "Continue as Teacher" again — confirmed this returned to the app *without* needing to sign in again, proving the session genuinely survives the trip rather than just appearing to. A full regression pass (Settings, Class Mode, the accent color picker, Recognition Screen) confirmed the new link didn't disturb anything else.
+
+### Architectural Decisions Made During Implementation
+- **The link only navigates — it does not sign out.** Signing out and "going to look at another product" are different actions with different consequences; conflating them would have meant losing the teacher session every time someone just wanted to peek at the Student side, which is the opposite of what was asked for.
+
+### Future TODOs
+- (Carried over, unchanged): Role-based routing; real Student Portal; Learning Hub; Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Classroom ID + Co-Teacher Joining (Teacher-to-Teacher — Student-Facing Piece Deliberately Not Built)
+
+**Context:** three related asks — a shareable classroom ID, a way to add a co-teacher, and the Student Portal asking for a classroom ID. The first two are teacher-to-teacher and safe to build now. The third runs directly into a boundary this project has carried since early on — see the dedicated section below rather than a quiet skip.
+
+### What already existed, found before writing anything new
+`models/Classroom.js` already had a `classroomJoinCode` field, reserved and always null, with its own doc comment anticipating exactly this: "a future student/parent joining flow... would populate this." `SettingsView.js`'s Teachers tab already had a disabled "+ Invite Teacher" button with "Coming soon." Neither needed inventing from scratch — this phase populates and wires up structure that was already anticipated.
+
+### Features Added — Classroom ID (safe, teacher-only)
+- **`generateJoinCode()`** (new, in `idGenerator.js`) — a 6-character human-shareable code, excluding visually ambiguous characters (0/O, 1/I/L), distinct from the existing UUID generator used for record ids.
+- **`classroomService.ensureJoinCode()`** — lazily backfills a code for classrooms that predate this feature, called whenever Settings' Teachers tab is opened.
+- **The disabled "+ Invite Teacher" placeholder is now a real Classroom ID display** with a Copy button, in the same tab, owner-visible.
+
+### Features Added — Co-Teacher Joining (self-service, no email lookup needed)
+This app has no way to look up another Google account by email (see `authService.js`'s own module comment) — so joining works the other way around: a co-teacher, signed into *their own* account, enters the classroom's ID themselves.
+- **A new `joinCodes/{code}` lookup collection** (client code + proposed rules) maps a code to a classroom id — deliberately separate from the classroom document itself, since a non-member can't read that document at all under the current rules.
+- **`workspaceService.joinClassroomByCode()`** resolves the code and adds the caller as a teacher member via a new, deliberately narrow repository method, `addSelfAsTeacher()` — additive only (`arrayUnion` plus one new map key), never a full document overwrite. The newly-joined classroom surfaces automatically through the *existing* `classroomRefs` subscription, the same mechanism that already makes a newly-created classroom appear on Home — no new state-sync logic was needed for that part.
+- **`ui/components/JoinClassroomModal.js`** (new) — matches `NewClassroomModal.js`'s structure exactly. **"Join a Classroom" added to both `HomeView.js` and `WelcomeView.js`** — the latter matters specifically because a co-teacher signing in for the first time has *zero* classrooms yet, so `WelcomeView` (not `HomeView`) is the actual first screen they'd land on.
+
+### A required Firestore rules change — proposed, not verified
+Confirmed directly in `firestore.rules`: the current rule only lets an existing member read a classroom document at all, so `getClassroomIdByJoinCode` and `addSelfAsTeacher` cannot work against the currently-deployed rules as they stand. Two additions proposed in `firestore.rules` itself: a `joinCodes` collection (readable by any signed-in user, write-once, revealing only an opaque classroom id — no student data, no scores, nothing sensitive), and a narrowly-scoped second path on the classroom `allow update` rule permitting a non-member to add *exactly their own uid* and nothing else (checked via `diff().affectedKeys()`, rejecting any write that touches another field). This project's sandboxed environment has no real Firebase credentials, so unlike every other piece of client code in this phase, this rules change could not be tested end-to-end — it needs its own review and testing against a real Firestore project before being deployed, the same as the Google account-chooser fix from a previous phase.
+
+### The Student Portal piece — flagged directly, not quietly built or quietly skipped
+Asking the Student Portal for a classroom ID means validating that code against real classroom data from an *unauthenticated* visitor — a real student-facing data flow, not a UI-only placeholder anymore. This project's organizational data-handling rules require escalating anything involving sensitive/student data to the AI Working Committee before proceeding, and this exact category — "Student/Parent onboarding" — has been listed as blocked pending that review in this CHANGELOG's Future TODOs since early in the project. This is the first time that flag has been concretely, rather than abstractly, relevant. Nothing was built for it this phase; it needs that review first, not a workaround.
+
+### Files Modified
+- `src/js/utils/idGenerator.js` — `generateJoinCode()` added.
+- `src/js/services/classroomService.js` — `ensureJoinCode()` added.
+- `src/js/services/workspaceService.js` — `createJoinCodeMapping()`, `joinClassroomByCode()` added.
+- `src/js/repositories/classroomRepository.js`, `firestoreClassroomRepository.js` — three new methods each (`createJoinCodeMapping`, `getClassroomIdByJoinCode`, `addSelfAsTeacher`).
+- `src/js/ui/views/SettingsView.js` — Teachers tab's invite placeholder replaced with the real Classroom ID display.
+- `src/js/ui/views/HomeView.js`, `WelcomeView.js` — "Join a Classroom" added alongside "+ New Classroom."
+- `src/js/ui/components/JoinClassroomModal.js` (new).
+- `src/js/main.js` — `handleJoinClassroom()` added; wired into both Home and Welcome.
+- `firestore.rules` — proposed additions, clearly marked as unverified in this environment.
+- `src/css/styles.css` — join-code display, modal description/error text, and the two new action-button layouts.
+
+### Breaking Changes
+None to existing functionality — confirmed via a full regression pass (Settings' Groups/Students/Notebooks tabs, the Danger Zone reset feature, notebook marking, Class Mode, Recognition Screen) with zero errors.
+
+### Regression Verification
+The full join flow was tested with two genuinely distinct simulated teacher identities (not the same uid twice): Teacher A created a classroom and viewed its generated Classroom ID in Settings; Teacher A signed out; Teacher B signed in fresh (zero classrooms, landing on `WelcomeView`); Teacher B used "Join a Classroom" with Teacher A's code; confirmed Teacher B landed on the *exact same* classroom Teacher A created, and — reopening Settings' Teachers tab — that Teacher B now appears in the member list. This is the first test in this project's history that needed a mock supporting more than one simulated identity, added specifically to verify this feature honestly rather than testing a same-user round-trip and calling it equivalent.
+
+### Architectural Decisions Made During Implementation
+- **`addSelfAsTeacher()` was designed narrow specifically because of the security rule it would need** — an additive-only write (one new map key, one `arrayUnion` append) is the only shape that makes "a non-member may safely write this" expressible at all; a full-document-overwrite approach would have made a safe rule impossible to write.
+- **The join-code lookup was built as a separate, low-sensitivity collection rather than a query against `classrooms` itself** — a query would require read access the requester doesn't have yet; a tiny mapping document that reveals nothing but an opaque id sidesteps that without weakening the classroom document's own access control at all.
+- **The Student Portal's classroom-ID lookup was not built, and that decision is named rather than left implicit** — this is exactly the kind of student-facing data flow this project has held as needing the AI Working Committee's review first, and treating "asked for it directly" as an override of that standing rule would be the wrong call.
+
+### Future TODOs
+- Have the proposed `firestore.rules` changes reviewed and tested against a real Firestore project, then deployed.
+- Escalate the Student Portal's classroom-ID validation to the AI Working Committee, per this project's own data-handling rules, before building any part of it.
+- (Carried over, unchanged): Role-based routing; real Student Portal; Learning Hub; Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.

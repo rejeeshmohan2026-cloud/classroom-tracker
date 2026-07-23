@@ -24,6 +24,8 @@ import * as accentColorPreferenceService from './services/accentColorPreferenceS
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
+import { renderLandingView } from './ui/views/LandingView.js';
+import { renderStudentPlaceholderView } from './ui/views/StudentPlaceholderView.js';
 import { renderHomeView } from './ui/views/HomeView.js';
 import { renderTrackerView } from './ui/views/TrackerView.js';
 import { renderSettingsView } from './ui/views/SettingsView.js';
@@ -38,6 +40,7 @@ import { renderRecognitionScreenView } from './ui/views/RecognitionScreenView.js
 import { renderLoginView } from './ui/views/LoginView.js';
 import { renderUserBar } from './ui/components/UserBar.js';
 import { openNewClassroomModal } from './ui/components/NewClassroomModal.js';
+import { openJoinClassroomModal } from './ui/components/JoinClassroomModal.js';
 
 let appContainer = null;
 let userBarContainer = null;
@@ -52,6 +55,7 @@ function handleSelectAccentColor(colorId) {
   renderUserBar(userBarContainer, {
     user: currentUser,
     onSignOut: handleSignOut,
+    onBackToLanding: () => router.navigate('/'),
     currentAccentColorId,
     onSelectAccentColor: handleSelectAccentColor,
     onSelectCustomAccentColor: handleSelectCustomAccentColor,
@@ -122,6 +126,31 @@ function handleNewClassroom() {
   });
 }
 
+function handleJoinClassroom() {
+  openJoinClassroomModal({
+    onJoin: (code, { onSuccess, onError }) => {
+      workspaceService
+        .joinClassroomByCode(code, currentUser.uid, currentUser.displayName)
+        .then((result) => {
+          if (!result.success) {
+            onError(
+              result.reason === 'not_found'
+                ? 'That Classroom ID doesn\u2019t match any classroom. Double-check it with your co-teacher.'
+                : 'Enter the Classroom ID your co-teacher shared with you.'
+            );
+            return;
+          }
+          onSuccess();
+          router.navigate(`/classroom/${result.classroomId}`);
+        })
+        .catch((error) => {
+          console.error('[main] Failed to join classroom:', error);
+          onError('Something went wrong joining that classroom. Please try again.');
+        });
+    },
+  });
+}
+
 const CLASSROOM_ROUTE_NAMES = [
   'dashboard',
   'tracker',
@@ -148,6 +177,28 @@ function renderLoadingScreen(container) {
 }
 
 function renderRoute(route) {
+  // Bloom Labs platform-level routes — deliberately checked before the
+  // auth gate below. Neither of these is part of Classroom Tracker's
+  // own flow; they sit one layer above it (and above Student Portal,
+  // once that exists), so no sign-in is required just to see the
+  // product picker or the placeholder.
+  if (route.name === 'landing') {
+    userBarContainer.innerHTML = '';
+    renderLandingView(appContainer, {
+      onContinueAsTeacher: () => router.navigate('/teacher'),
+      onContinueAsStudent: () => router.navigate('/student'),
+    });
+    return;
+  }
+
+  if (route.name === 'studentPlaceholder') {
+    userBarContainer.innerHTML = '';
+    renderStudentPlaceholderView(appContainer, {
+      onBackToLanding: () => router.navigate('/'),
+    });
+    return;
+  }
+
   if (!currentUser) {
     userBarContainer.innerHTML = '';
     renderLoginView(appContainer, { onSignIn: handleSignIn });
@@ -157,6 +208,7 @@ function renderRoute(route) {
   renderUserBar(userBarContainer, {
     user: currentUser,
     onSignOut: handleSignOut,
+    onBackToLanding: () => router.navigate('/'),
     currentAccentColorId,
     onSelectAccentColor: handleSelectAccentColor,
     onSelectCustomAccentColor: handleSelectCustomAccentColor,
@@ -171,7 +223,7 @@ function renderRoute(route) {
   if (CLASSROOM_ROUTE_NAMES.includes(route.name)) {
     const classroom = workspaceService.getClassroomById(route.classroomId);
     if (!classroom) {
-      router.navigate('/');
+      router.navigate('/teacher');
       return;
     }
 
@@ -223,7 +275,7 @@ function renderRoute(route) {
         onBack: () => router.navigate(`/classroom/${classroom.id}`),
         onNavigateSection: (section) =>
           router.navigate(`/classroom/${classroom.id}/settings/${section}`),
-        onDeleted: () => router.navigate('/'),
+        onDeleted: () => router.navigate('/teacher'),
         onReopenSetupWizard: () => router.navigate(`/classroom/${classroom.id}/setup`),
       });
     } else if (route.name === 'setup') {
@@ -294,12 +346,13 @@ function renderRoute(route) {
   const { classrooms } = workspaceService.getState();
   console.log('[main] Home/Welcome decision — classroom count:', classrooms.length);
   if (classrooms.length === 0) {
-    renderWelcomeView(appContainer, { onNewClassroom: handleNewClassroom });
+    renderWelcomeView(appContainer, { onNewClassroom: handleNewClassroom, onJoinClassroom: handleJoinClassroom });
   } else {
     renderHomeView(appContainer, {
       classrooms,
       onSelectClassroom: (id) => router.navigate(`/classroom/${id}`),
       onNewClassroom: handleNewClassroom,
+      onJoinClassroom: handleJoinClassroom,
     });
   }
 }
@@ -339,6 +392,7 @@ function init() {
       renderUserBar(userBarContainer, {
         user: currentUser,
         onSignOut: handleSignOut,
+        onBackToLanding: () => router.navigate('/'),
         currentAccentColorId,
         onSelectAccentColor: handleSelectAccentColor,
         onSelectCustomAccentColor: handleSelectCustomAccentColor,

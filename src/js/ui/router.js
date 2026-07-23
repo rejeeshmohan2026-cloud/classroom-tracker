@@ -3,7 +3,10 @@
  *
  * A small hash-based router — no library, matching the project's
  * "vanilla only" constraint. Recognises:
- *   #/                                        -> home (or welcome, decided by main.js)
+ *   #/                                        -> Bloom Labs landing page (product picker)
+ *   #/teacher                                 -> Classroom Tracker home (or welcome, decided by main.js) — the
+ *                                                 existing teacher app's own entry point, unchanged in behavior
+ *   #/student                                 -> Student Portal placeholder ("coming soon")
  *   #/classroom/{id}                          -> dashboard (the classroom's landing page)
  *   #/classroom/{id}/class-mode               -> tracker (today's Class Mode — unchanged, just relocated)
  *   #/classroom/{id}/settings/{section?}      -> settings
@@ -17,6 +20,16 @@
  *   #/classroom/{id}/recognition/{period?}/{categoryId?}     -> recognition screen (defaults resolved by the view itself)
  * Deep links work on refresh since the route is derived from the URL,
  * not from in-memory state.
+ *
+ * Bloom Labs platform note: the bare root used to mean "Classroom
+ * Tracker home" (back when this was the only product). It now means
+ * the platform's own landing page, and the teacher app's home has its
+ * own explicit address (#/teacher) instead — everything below that,
+ * including every classroom/{id}/... route, is completely unchanged.
+ * A deep link straight to #/teacher or #/classroom/{id}/... still
+ * skips the landing page entirely, same as it always has for any
+ * other route — no new logic was needed for that, it just falls out
+ * of how hash parsing already works here.
  */
 
 function parseHash() {
@@ -60,6 +73,22 @@ function parseHash() {
     return { name: 'dashboard', classroomId: parts[1] };
   }
 
+  if (parts[0] === 'teacher') {
+    return { name: 'home' };
+  }
+
+  if (parts[0] === 'student') {
+    return { name: 'studentPlaceholder' };
+  }
+
+  if (parts.length === 0) {
+    return { name: 'landing' };
+  }
+
+  // Anything unrecognized falls back to the teacher app's own home,
+  // matching this router's existing "unknown route -> home" behavior
+  // rather than silently landing on the platform picker for a typo'd
+  // or stale URL.
   return { name: 'home' };
 }
 

@@ -26,6 +26,7 @@ import { DEFAULT_BADGE_CATALOG } from '../config/badgeConfig.js';
 import * as memberService from './memberService.js';
 import { MEMBER_ROLES } from '../config/memberRoles.js';
 import * as notebookService from './notebookService.js';
+import { generateJoinCode } from '../utils/idGenerator.js';
 
 export class ClassroomValidationError extends Error {}
 
@@ -217,4 +218,18 @@ export function getStudentCount(classroom) {
 /** Total number of members (owner + teachers) in a classroom. */
 export function getMemberCount(classroom) {
   return classroom.memberUids?.length || 0;
+}
+
+/**
+ * Lazily backfills a join code for classrooms created before this
+ * feature existed — models/Classroom.js's `classroomJoinCode` field has
+ * existed as a reserved placeholder (always null) since before real
+ * membership existed; this is where it actually gets populated.
+ * Returns true if it generated a new code (so the caller knows to
+ * persist the classroom), false if one already existed.
+ */
+export function ensureJoinCode(classroom) {
+  if (classroom.classroomJoinCode) return false;
+  classroom.classroomJoinCode = generateJoinCode();
+  return true;
 }

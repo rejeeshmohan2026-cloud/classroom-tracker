@@ -132,4 +132,22 @@ export class ClassroomRepository {
   async setAccentColorPreference(uid, colorId) {
     throw new Error('ClassroomRepository.setAccentColorPreference() must be implemented by a subclass');
   }
+
+  /** Populates the small public lookup used by "Join a Classroom" — see services/classroomService.js's ensureJoinCode(). */
+  // eslint-disable-next-line no-unused-vars
+  async createJoinCodeMapping(code, classroomId) {
+    throw new Error('ClassroomRepository.createJoinCodeMapping() must be implemented by a subclass');
+  }
+
+  /** Resolves a join code to a classroomId, or null if the code doesn't exist. */
+  // eslint-disable-next-line no-unused-vars
+  async getClassroomIdByJoinCode(code) {
+    throw new Error('ClassroomRepository.getClassroomIdByJoinCode() must be implemented by a subclass');
+  }
+
+  /** A narrow, additive-only write adding exactly one uid as a member — see firestoreClassroomRepository.js's implementation for why this shape matters for the security rule it needs. */
+  // eslint-disable-next-line no-unused-vars
+  async addSelfAsTeacher(classroomId, uid, memberInfo) {
+    throw new Error('ClassroomRepository.addSelfAsTeacher() must be implemented by a subclass');
+  }
 }

@@ -2,9 +2,15 @@
  * ui/components/UserBar.js
  *
  * A small persistent bar (avatar + name + accent-color edit button +
- * Sign Out) shown above every screen once a teacher is signed in —
- * added once here, in main.js, rather than duplicated into every
- * view's own header.
+ * a link back to Bloom Labs + Sign Out) shown above every screen once
+ * a teacher is signed in — added once here, in main.js, rather than
+ * duplicated into every view's own header.
+ *
+ * The "\u2190 Bloom Labs" link exists purely so a signed-in teacher can
+ * get back to the platform landing page (and from there, the Student
+ * placeholder) without editing the URL by hand — there was previously
+ * no in-app way to do this once inside the teacher app. It does not
+ * sign anyone out or touch auth state; it's just navigation.
  *
  * The color edit control is icon-only (a pencil, no "Edit" label) and
  * sits grouped with Sign Out on the right side of the bar, per explicit
@@ -22,7 +28,7 @@
 import { ACCENT_COLOR_OPTIONS } from '../../config/accentColorConfig.js';
 import { createSpectrumColorPicker } from './SpectrumColorPicker.js';
 
-export function renderUserBar(container, { user, onSignOut, currentAccentColorId, onSelectAccentColor, onSelectCustomAccentColor, onPreviewCustomAccentColor }) {
+export function renderUserBar(container, { user, onSignOut, currentAccentColorId, onSelectAccentColor, onSelectCustomAccentColor, onPreviewCustomAccentColor, onBackToLanding }) {
   container.innerHTML = '';
   if (!user) return;
 
@@ -142,6 +148,16 @@ export function renderUserBar(container, { user, onSignOut, currentAccentColorId
 
     pickerWrapper.append(editButton, popover);
     rightGroup.appendChild(pickerWrapper);
+  }
+
+  if (onBackToLanding) {
+    const landingLink = document.createElement('button');
+    landingLink.type = 'button';
+    landingLink.className = 'btn btn--text';
+    landingLink.textContent = '\u2190 Bloom Labs';
+    landingLink.title = 'Back to Bloom Labs';
+    landingLink.addEventListener('click', onBackToLanding);
+    rightGroup.appendChild(landingLink);
   }
 
   const signOutButton = document.createElement('button');

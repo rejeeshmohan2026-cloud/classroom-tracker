@@ -149,3 +149,16 @@ export function migrateLegacyChecksIfNeeded(classroom) {
     classroom.notebooks[check.subjectId][check.notebookTypeId][dateKey] = cleanedEntries;
   });
 }
+
+/**
+ * Clears the entire day-by-day register — every subject, every
+ * notebook type, every date, every student's submission/completion
+ * entry — for a comprehensive classroom reset (see
+ * services/studentService.js's resetAllStudentData(), the per-student
+ * counterpart to this). Deliberately does not touch notebookConfig
+ * (the subject/notebook-type taxonomy itself) — that's classroom
+ * configuration, not accumulated data.
+ */
+export function clearAllNotebookData(classroom) {
+  classroom.notebooks = {};
+}

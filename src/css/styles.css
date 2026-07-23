@@ -380,6 +380,13 @@ select:focus-visible,
   gap: 1rem;
 }
 
+.welcome-view__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .welcome-view__title {
   font-size: 1.75rem;
   font-weight: var(--font-weight-black);
@@ -391,6 +398,79 @@ select:focus-visible,
   color: var(--color-muted);
   margin: 0 0 0.75rem;
   line-height: 1.5;
+}
+
+/*
+ * Bloom Labs landing page — the platform's own entry point, one level
+ * above any single product. Reuses .welcome-view's title/subtitle
+ * typography scale rather than inventing a parallel one, since this is
+ * structurally the same "centered, title + subtitle" pattern; only the
+ * two-journey-card layout below is genuinely new.
+ */
+.landing-view {
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 1rem;
+}
+
+.landing-view__title {
+  font-size: 2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.landing-view__subtitle {
+  font-size: 1rem;
+  color: var(--color-muted);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.landing-view__journeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.landing-view__journey-card {
+  flex: 1 1 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  padding: 2rem 1.5rem;
+}
+
+.landing-view__journey-icon {
+  font-size: 2rem;
+}
+
+.landing-view__journey-title {
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.landing-view__journey-description {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+  min-height: 3.5em;
 }
 
 /* Home view (classroom dashboard) */
@@ -408,6 +488,11 @@ select:focus-visible,
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1.5rem;
+}
+
+.home-view__actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 .home-view__title {
@@ -529,6 +614,19 @@ select:focus-visible,
   margin: 0 0 1rem;
   font-size: 1.25rem;
   font-weight: var(--font-weight-black);
+}
+
+.modal__description {
+  margin: -0.5rem 0 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.modal__error {
+  margin: -0.5rem 0 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
 }
 
 .modal__label {
@@ -880,6 +978,12 @@ select:focus-visible,
   border-color: var(--color-danger);
 }
 
+.settings-section__divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.25rem 0;
+}
+
 .settings-section__label {
   display: block;
   font-size: 0.85rem;
@@ -915,6 +1019,23 @@ select:focus-visible,
   font-size: 1rem;
   font-weight: var(--font-weight-black);
   margin: 0 0 0.6rem;
+}
+
+/* Classroom ID (join code) display — Settings > Teachers, owner-only. */
+.join-code-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.join-code-display__value {
+  font-family: 'Courier New', monospace;
+  font-size: 1.4rem;
+  font-weight: var(--font-weight-black);
+  letter-spacing: 0.15em;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 1rem;
 }
 
 .settings-editable-list {

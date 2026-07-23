@@ -37,6 +37,7 @@ import {
   getDocs,
   writeBatch,
   runTransaction,
+  arrayUnion,
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getFirebaseApp } from '../services/firebaseApp.js';
 import { ClassroomRepository } from './classroomRepository.js';
@@ -73,6 +74,22 @@ class FirestoreClassroomRepository extends ClassroomRepository {
 
   _classroomRefDoc(uid, classroomId) {
     return doc(this._getDb(), 'users', uid, 'classroomRefs', classroomId);
+  }
+
+  /**
+   * A small, separate lookup collection — joinCodes/{code} -> { classroomId }
+   * — deliberately NOT a query against `classrooms` itself. Current
+   * security rules only let a member read a classroom document; a
+   * co-teacher trying to join isn't a member yet, so they can't query
+   * `classrooms` at all. This tiny mapping document reveals only an
+   * opaque classroom id for a given code, nothing about the
+   * classroom's actual content, so it can safely have much more
+   * permissive read rules than the classroom document itself (see
+   * firestore.rules — this needs its own rule added, proposed
+   * alongside this code, not assumed to already be permitted).
+   */
+  _joinCodeDoc(code) {
+    return doc(this._getDb(), 'joinCodes', code);
   }
 
   _classroomRefsCollection(uid) {
@@ -115,6 +132,42 @@ class FirestoreClassroomRepository extends ClassroomRepository {
       joinedAt: classroom.members[ownerUid].joinedAt,
     });
     await batch.commit();
+  }
+
+  /** Populates the small public lookup used by "Join a Classroom" — called once, when a join code is first generated (see classroomService.ensureJoinCode()). */
+  async createJoinCodeMapping(code, classroomId) {
+    await setDoc(this._joinCodeDoc(code), { classroomId });
+  }
+
+  /** Returns the classroomId a join code points to, or null if the code doesn't exist. */
+  async getClassroomIdByJoinCode(code) {
+    const docSnapshot = await getDoc(this._joinCodeDoc(code));
+    return docSnapshot.exists() ? docSnapshot.data().classroomId : null;
+  }
+
+  /**
+   * The actual "join" write — deliberately a narrow, additive-only
+   * update (this uid's own member entry, plus arrayUnion so it can
+   * never clobber another teacher's concurrent join) rather than a
+   * full classroom overwrite. This narrowness is exactly what makes a
+   * safe Firestore rule for it possible: the rule only needs to permit
+   * "a non-member may add exactly their own uid," not "a non-member may
+   * write anything" — see firestore.rules for the proposed addition
+   * this specific shape enables.
+   */
+  async addSelfAsTeacher(classroomId, uid, memberInfo) {
+    await setDoc(
+      this._classroomDoc(classroomId),
+      {
+        members: { [uid]: memberInfo },
+        memberUids: arrayUnion(uid),
+      },
+      { merge: true }
+    );
+    await setDoc(this._classroomRefDoc(uid, classroomId), {
+      role: memberInfo.role,
+      joinedAt: memberInfo.joinedAt,
+    });
   }
 
   async saveClassroom(classroom) {

@@ -81,8 +81,19 @@ export function onAuthStateChange(callback) {
   });
 }
 
+/**
+ * `prompt: 'select_account'` forces Google's account chooser to appear
+ * every time — without it, signInWithPopup will often silently reuse
+ * whichever Google account the browser is already signed into, rather
+ * than asking. That's the actual mechanism behind not being able to
+ * freely switch accounts: Firebase's own signOut() below correctly
+ * clears this app's session, but the *browser's* underlying Google
+ * session persists, so the next sign-in attempt would otherwise
+ * silently reauthenticate as the same account instead of prompting.
+ */
 export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   const credential = await signInWithPopup(auth, provider);
   return toSafeProfile(credential.user);
 }
