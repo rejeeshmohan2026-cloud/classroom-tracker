@@ -194,6 +194,15 @@ class FirestoreClassroomRepository extends ClassroomRepository {
     const docSnapshot = await getDoc(this._userDoc(uid));
     return docSnapshot.exists() ? docSnapshot.data().recentNotebooks || [] : [];
   }
+
+  async getThemePreferenceOnce(uid) {
+    const docSnapshot = await getDoc(this._userDoc(uid));
+    return docSnapshot.exists() ? docSnapshot.data().theme || null : null;
+  }
+
+  async setThemePreference(uid, theme) {
+    await setDoc(this._userDoc(uid), { theme }, { merge: true });
+  }
 }
 
 export const firestoreClassroomRepository = new FirestoreClassroomRepository();

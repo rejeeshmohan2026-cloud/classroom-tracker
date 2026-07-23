@@ -72,13 +72,36 @@ export function renderDashboardView(container, props) {
   wrapper.className = 'dashboard-view';
 
   const classroomContext = document.createElement('div');
+  classroomContext.className = 'classroom-hero';
+
+  const greeting = document.createElement('p');
+  greeting.className = 'classroom-hero__greeting';
+  greeting.textContent = `Welcome back, ${getFirstName(currentUser?.displayName)}`;
+  classroomContext.appendChild(greeting);
+
   const title = document.createElement('h1');
   title.className = 'tracker-header__title';
   title.textContent = getDisplayName(classroom);
+  classroomContext.appendChild(title);
+
   const subtitle = document.createElement('p');
   subtitle.className = 'tracker-header__subtitle';
   subtitle.textContent = getDisplaySubtitle(classroom);
-  classroomContext.append(title, subtitle);
+  classroomContext.appendChild(subtitle);
+
+  // Deliberately timeless — a sense of entering a classroom, not a
+  // dashboard summary. No live stats or pending counts here; those
+  // already live in their own widgets below. `classroom.motto` doesn't
+  // exist as a field yet (setting one is scoped to a future Classroom
+  // Culture phase — banner, motto, color, theme, mascot) — this slot
+  // is forward-compatible for when that phase adds it, but renders
+  // nothing until then.
+  if (classroom.motto) {
+    const motto = document.createElement('p');
+    motto.className = 'classroom-hero__motto';
+    motto.textContent = classroom.motto;
+    classroomContext.appendChild(motto);
+  }
 
   const secondaryContentSlot = document.createElement('div');
 
@@ -93,9 +116,14 @@ export function renderDashboardView(container, props) {
   const content = document.createElement('div');
   content.className = 'dashboard-view__content';
 
-  // 1. What should I celebrate?
-  content.appendChild(createRecognitionWidgetElement({ classroom, onViewAll: onOpenRecognition }));
-  content.appendChild(createWeeklySnapshotWidgetElement({ classroom }));
+  // 1. What should I celebrate? — grouped together (smaller internal
+  // gap) so whitespace itself communicates that these two answer the
+  // same question, distinct from the larger gap before Pending Tasks.
+  const celebrateGroup = document.createElement('div');
+  celebrateGroup.className = 'dashboard-view__group';
+  celebrateGroup.appendChild(createRecognitionWidgetElement({ classroom, onViewAll: onOpenRecognition }));
+  celebrateGroup.appendChild(createWeeklySnapshotWidgetElement({ classroom }));
+  content.appendChild(celebrateGroup);
 
   // 2. What needs my attention?
   content.appendChild(createPendingTasksWidgetElement({ classroom, onSelectTask: onSelectPendingTask }));
@@ -118,6 +146,12 @@ export function renderDashboardView(container, props) {
   container.appendChild(wrapper);
 
   loadContinueWorking(classroom, currentUser, secondaryContentSlot, onSelectNotebook);
+}
+
+/** Extracts a first name for the Hero's greeting — falls back gracefully if displayName is ever missing. */
+function getFirstName(displayName) {
+  if (!displayName) return 'there';
+  return displayName.trim().split(/\s+/)[0];
 }
 
 /**
@@ -168,3 +202,4 @@ async function loadContinueWorking(classroom, currentUser, slot, onSelectNoteboo
   slot.innerHTML = '';
   slot.appendChild(createContinueWorkingWidgetElement({ entries: resolvedEntries, onOpenNotebook: onSelectNotebook }));
 }
+

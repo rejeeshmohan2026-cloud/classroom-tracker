@@ -99,4 +99,20 @@ export class ClassroomRepository {
   async getRecentNotebooksOnce(uid) {
     throw new Error('ClassroomRepository.getRecentNotebooksOnce() must be implemented by a subclass');
   }
+
+  /**
+   * Theme preference (Phase 6A — see services/themePreferenceService.js):
+   * one-time read of this uid's stored 'light' | 'dark' | 'system'
+   * value, or null if never set (a brand-new user).
+   */
+  // eslint-disable-next-line no-unused-vars
+  async getThemePreferenceOnce(uid) {
+    throw new Error('ClassroomRepository.getThemePreferenceOnce() must be implemented by a subclass');
+  }
+
+  /** Persists a theme preference for this uid. Fire-and-forget from the caller's side — see themePreferenceService.js. */
+  // eslint-disable-next-line no-unused-vars
+  async setThemePreference(uid, theme) {
+    throw new Error('ClassroomRepository.setThemePreference() must be implemented by a subclass');
+  }
 }

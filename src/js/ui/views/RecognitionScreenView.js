@@ -171,7 +171,7 @@ export function renderRecognitionScreenView(container, props) {
   if (winners.length === 0) {
     const periodLabel = PERIOD_TABS.find((tab) => tab.id === period).label.toLowerCase();
     detailArea.appendChild(
-      createEmptyStateElement({ message: `No ${selectedCategory.label} yet ${periodLabel}.` })
+      createEmptyStateElement({ message: `No ${selectedCategory.label} yet ${periodLabel} \u2014 check back soon.` })
     );
   } else {
     detailArea.appendChild(createRecognitionCardElement({ category: selectedCategory, winners, period, variant: 'full' }));

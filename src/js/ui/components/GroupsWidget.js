@@ -5,13 +5,28 @@
  * their student counts. Reuses the existing Settings > Groups tab for
  * actual management — this widget is read-only navigation, not a
  * second place to add/rename/remove groups.
+ *
+ * Phase 7B: each team renders as an overlapping avatar cluster (a
+ * "huddle") rather than a plain text chip — Collaboration-intent's
+ * distinct shape language (see CHANGELOG's Phase 7B entry). Distinct
+ * from Recognition's single large ring-bordered avatar (one person,
+ * celebrated) and Subjects' connected waypoint chips (a path, not
+ * people) elsewhere on the same Dashboard.
  */
 
 import { createEmptyStateElement } from './EmptyState.js';
 
+const MAX_VISIBLE_AVATARS = 3;
+
+function getInitials(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  return parts[0][0].toUpperCase();
+}
+
 export function createGroupsWidgetElement({ classroom, onOpenGroups }) {
   const widget = document.createElement('div');
-  widget.className = 'dashboard-widget';
+  widget.className = 'dashboard-widget dashboard-widget--community';
 
   const heading = document.createElement('h2');
   heading.className = 'dashboard-widget__heading';
@@ -19,20 +34,46 @@ export function createGroupsWidgetElement({ classroom, onOpenGroups }) {
   widget.appendChild(heading);
 
   if (classroom.teams.length === 0) {
-    widget.appendChild(createEmptyStateElement({ message: 'No groups yet.' }));
+    widget.appendChild(createEmptyStateElement({ message: 'Add a group in Settings to bring your class together.' }));
     return widget;
   }
 
   const list = document.createElement('div');
-  list.className = 'dashboard-widget__chip-list';
+  list.className = 'huddle-list';
 
   classroom.teams.forEach((team) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'dashboard-widget__chip';
-    chip.textContent = `${team.name} (${team.students.length})`;
-    chip.addEventListener('click', onOpenGroups);
-    list.appendChild(chip);
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'huddle-list__row';
+    row.addEventListener('click', onOpenGroups);
+
+    const cluster = document.createElement('div');
+    cluster.className = 'huddle-list__cluster';
+
+    const visibleStudents = team.students.slice(0, MAX_VISIBLE_AVATARS);
+    visibleStudents.forEach((student) => {
+      const avatar = document.createElement('span');
+      avatar.className = 'huddle-list__avatar';
+      avatar.textContent = getInitials(student.name);
+      cluster.appendChild(avatar);
+    });
+
+    const overflow = team.students.length - visibleStudents.length;
+    if (overflow > 0) {
+      const more = document.createElement('span');
+      more.className = 'huddle-list__avatar huddle-list__avatar--overflow';
+      more.textContent = `+${overflow}`;
+      cluster.appendChild(more);
+    }
+
+    row.appendChild(cluster);
+
+    const name = document.createElement('span');
+    name.className = 'huddle-list__name';
+    name.textContent = team.name;
+    row.appendChild(name);
+
+    list.appendChild(row);
   });
 
   widget.appendChild(list);

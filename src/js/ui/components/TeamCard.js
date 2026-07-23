@@ -35,8 +35,8 @@ export function createTeamCardElement(team, teamScore, { onTap, onSwipeLeft, onL
   if (highlightTeamId && team.id === highlightTeamId) {
     total.classList.add('team-card__total--pulse');
   }
-  total.textContent = String(teamScore);
-  total.setAttribute('aria-label', `${team.name} total score`);
+  total.textContent = `${teamScore} \u2b50`;
+  total.setAttribute('aria-label', `${team.name} total score: ${teamScore} stars`);
 
   header.append(title, total);
 

@@ -18,9 +18,30 @@ import * as studentProgressService from '../../services/studentProgressService.j
 import { getWeekRange } from '../../utils/dateHelpers.js';
 import { createEmptyStateElement } from './EmptyState.js';
 
+/**
+ * A small, reliable rank indicator — a colored circular badge for the
+ * top 3 (gold/silver/bronze), plain "#N" text beyond that. Built from
+ * CSS/DOM rather than medal emoji: emoji rendering is inconsistent
+ * across OS/browser combinations (this project has run into exactly
+ * that rendering gap before, with 📒 falling back to a box glyph in
+ * one test environment) — a real visibility concern, not just a
+ * stylistic one, so this needed a platform-independent fix.
+ */
+function createRankIndicator(rank) {
+  if (rank > 3) {
+    const text = document.createElement('span');
+    text.textContent = `#${rank}`;
+    return text;
+  }
+  const badge = document.createElement('span');
+  badge.className = `rank-badge rank-badge--${rank}`;
+  badge.textContent = String(rank);
+  return badge;
+}
+
 export function createWeeklySnapshotWidgetElement({ classroom }) {
   const widget = document.createElement('div');
-  widget.className = 'dashboard-widget';
+  widget.className = 'dashboard-widget dashboard-widget--editorial dashboard-widget--learn';
 
   const heading = document.createElement('h2');
   heading.className = 'dashboard-widget__heading';
@@ -34,14 +55,24 @@ export function createWeeklySnapshotWidgetElement({ classroom }) {
   const totalWeeklyStars = rank.reduce((sum, entry) => sum + entry.stars, 0);
 
   if (totalWeeklyStars === 0) {
-    widget.appendChild(createEmptyStateElement({ message: 'No stars awarded yet this week.' }));
+    widget.appendChild(createEmptyStateElement({ message: 'No stars awarded yet \u2014 plenty of week left.' }));
     return widget;
   }
 
-  const starsLine = document.createElement('p');
-  starsLine.className = 'dashboard-widget__stat-line';
-  starsLine.textContent = `\ud83d\udcd2 ${totalWeeklyStars} ${totalWeeklyStars === 1 ? 'star' : 'stars'} awarded this week`;
-  widget.appendChild(starsLine);
+  const kpiCard = document.createElement('div');
+  kpiCard.className = 'kpi-card';
+  const kpiIcon = document.createElement('span');
+  kpiIcon.className = 'kpi-card__icon';
+  kpiIcon.textContent = '\ud83d\udcd2';
+  kpiIcon.setAttribute('aria-hidden', 'true');
+  const kpiNumber = document.createElement('span');
+  kpiNumber.className = 'kpi-card__number';
+  kpiNumber.textContent = String(totalWeeklyStars);
+  const kpiLabel = document.createElement('span');
+  kpiLabel.className = 'kpi-card__label';
+  kpiLabel.textContent = `${totalWeeklyStars === 1 ? 'star' : 'stars'} awarded this week`;
+  kpiCard.append(kpiIcon, kpiNumber, kpiLabel);
+  widget.appendChild(kpiCard);
 
   const topThree = rank.filter((entry) => entry.rank <= 3 && entry.stars > 0);
   if (topThree.length > 0) {
@@ -51,10 +82,20 @@ export function createWeeklySnapshotWidgetElement({ classroom }) {
     widget.appendChild(leaderboardHeading);
 
     const list = document.createElement('ol');
-    list.className = 'dashboard-widget__rank-list';
+    list.className = 'editorial-list';
     topThree.forEach((entry) => {
       const item = document.createElement('li');
-      item.textContent = `#${entry.rank} \u00b7 ${entry.studentName} \u2014 ${entry.stars} \u2b50`;
+      item.className = `editorial-list__row${entry.rank <= 3 ? ` editorial-list__row--rank-${entry.rank}` : ''}`;
+      const rank = document.createElement('span');
+      rank.className = 'editorial-list__rank';
+      rank.appendChild(createRankIndicator(entry.rank));
+      const name = document.createElement('span');
+      name.className = 'editorial-list__name';
+      name.textContent = entry.studentName;
+      const value = document.createElement('span');
+      value.className = 'editorial-list__value';
+      value.textContent = `${entry.stars} \u2b50`;
+      item.append(rank, name, value);
       list.appendChild(item);
     });
     widget.appendChild(list);

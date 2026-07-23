@@ -27,7 +27,7 @@ import { createEmptyStateElement } from './EmptyState.js';
 
 export function createRecognitionWidgetElement({ classroom, onViewAll }) {
   const widget = document.createElement('div');
-  widget.className = 'dashboard-widget dashboard-widget--recognition';
+  widget.className = 'dashboard-widget dashboard-widget--recognition dashboard-widget--celebrate';
 
   const header = document.createElement('div');
   header.className = 'dashboard-widget__header-row';
@@ -55,7 +55,7 @@ export function createRecognitionWidgetElement({ classroom, onViewAll }) {
     .filter((entry) => entry.winners.length > 0);
 
   if (categoriesWithWinners.length === 0) {
-    widget.appendChild(createEmptyStateElement({ message: 'No recognitions yet this week.' }));
+    widget.appendChild(createEmptyStateElement({ message: 'The week is just getting started \u2014 recognitions will appear here soon.' }));
     return widget;
   }
 

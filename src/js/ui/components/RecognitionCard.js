@@ -98,7 +98,9 @@ export function createRecognitionCardElement({ category, winners, period, varian
     winnerEl.className = 'recognition-card__winner';
 
     const avatar = document.createElement('span');
-    avatar.className = 'recognition-card__avatar';
+    avatar.className = isTeamWinner(winner)
+      ? 'recognition-card__avatar recognition-card__avatar--team'
+      : 'recognition-card__avatar';
     avatar.textContent = isTeamWinner(winner) ? '\ud83d\udc65' : getInitials(winner.studentName);
 
     const name = document.createElement('span');

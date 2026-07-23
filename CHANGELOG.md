@@ -322,3 +322,493 @@ While consolidating the two duplicated reduced-motion blocks (Stage 4), the merg
 - Dark theme remains a legitimate future option — this phase's semantic token layer is what makes it cheap to add later (swap token values only, touch no component CSS) — not scheduled now.
 - A full pixel-level spacing migration (snapping every remaining ad hoc `padding` value onto the `--space-*` scale) was intentionally scoped narrower this phase (font-weight and radius only, both exact-value migrations) — a good candidate for a future, low-risk follow-up pass.
 - (Carried over, unchanged from Phase 4's list): notebook quick-open, Recently Viewed Students, Student Dashboard preview, printable certificates, Teacher's Choice service, Perfect Attendance data source, Student/Parent onboarding.
+
+---
+
+## Phase 6A — Theme System
+
+**Scope:** Light/Dark/System theme support, built directly on Phase 5's token architecture. No workspace personalization (that's Phase 6B, tracked separately). Implemented in stages, testing after each: token architecture correction → dark palette (contrast-verified) → theme resolution service → persistence → UI wiring → full regression.
+
+### A correction made before the dark palette
+
+Before choosing any dark-mode values, checked whether Phase 5's white-on-cyan contrast fix (`--color-ink` used for button text on brand-color fills) would survive a theme where `--color-ink` itself has to flip from dark to light. It wouldn't have — near-white text on cyan measures 1.94:1, worse than the original bug. Introduced `--color-on-brand` (`#1a1a1a`, deliberately never redefined under `[data-theme="dark"]`) and migrated all 8 of Phase 5's affected selectors (`.btn--primary`, `.team-card__header`, `.wizard-checklist__icon--done`, `.wizard-badge`, `.user-bar__avatar--fallback`, `.toggle-group__button--active`, `.notebook-date-bar__today-badge`, `.recognition-screen__category-chip--active`) to it before writing any dark-mode CSS at all.
+
+### A second bug found during dark-mode testing (not before)
+
+`.user-bar` (the persistent top bar) used `--color-ink`/`--color-surface` for its own background/text — fine in light mode, where that produced a fixed dark bar with light text, but under dark theme those tokens flip, which would have **inverted the bar into a light strip** — the opposite of its intended "consistent app chrome" look. Caught by actually looking at a dark-mode screenshot rather than assuming the fix generalized. Introduced two more theme-independent tokens, `--color-chrome-bg`/`--color-chrome-text` (`#1a1a1a`/`#ffffff`), and migrated `.user-bar`, `.user-bar .btn--text` (Sign Out), and the theme selector's own unselected-state colors (which also needed dedicated, contrast-verified fixed values — `#b8bcc0` text at 9.11:1, `#6b7075` border at 3.48:1 — since `--color-muted`/`--color-border` were never designed for a background that stays fixed while the surrounding page theme changes).
+
+### Features Added
+- **Dark theme**: `[data-theme="dark"]` overrides only the four genuinely theme-dependent tokens (`--color-bg`, `--color-surface`, `--color-ink`, `--color-muted`, `--color-border`) — every brand color (`--color-primary/success/warning/accent/danger`) and both theme-independent tokens stay untouched. Every dark-mode value was computed and verified against WCAG AA *before* being written (see CHANGELOG math below), not assumed from the light-mode fixes.
+- **Light / Dark / System selector**, in the persistent user-bar (theme is a per-teacher preference, not a per-classroom one, so it doesn't live in classroom Settings). `System` is a resolution rule, not a fourth token set — `services/themeService.js` reads `window.matchMedia('(prefers-color-scheme: dark)')` and stays live: if the OS setting changes while System is selected, the applied theme updates immediately, no reload needed. Switching to an explicit Light/Dark choice tears that listener down, so it never gets silently overridden by a later OS change.
+- **New users default to System** — `services/themePreferenceService.js`'s `getPreferenceOnce()` returns `'system'` whenever nothing has been explicitly saved, so no special-casing is needed anywhere else.
+- **Theme cross-fade**: a brief `background-color`/`color` transition (`--duration-base`/`--ease-standard`) on `body`, `.dashboard-widget`, and `.classroom-card` — the two most common surface wrappers in the app. Deliberately not applied to every surface (would mean touching dozens of selectors for a purely cosmetic gain); other elements snap instantly on theme switch, a disclosed scope boundary, not an oversight.
+- **Persistence**: one new `theme` field on the same `users/{uid}` document already used for `recentNotebooks` — no new collection.
+
+### Files Created
+- `src/js/services/themeService.js` — pure resolve/apply logic (no I/O): given a preference, sets `document.documentElement.dataset.theme` and manages the System `matchMedia` listener.
+- `src/js/services/themePreferenceService.js` — pure persistence (no resolution logic): reads/writes the stored preference. Kept as two separate files deliberately, matching this project's established single-purpose-service convention (Notebook Service vs. Student Progress Service, etc.).
+
+### Files Modified
+- `src/css/styles.css` — `--color-on-brand`/`--color-chrome-bg`/`--color-chrome-text` tokens added; `[data-theme="dark"]` block added; theme cross-fade transitions added (and folded into the existing consolidated reduced-motion block); `.user-bar` and its children corrected to use the new chrome tokens.
+- `src/js/repositories/classroomRepository.js` / `firestoreClassroomRepository.js` — added `getThemePreferenceOnce(uid)` / `setThemePreference(uid, theme)`.
+- `src/js/ui/components/UserBar.js` — added the Light/Dark/System selector.
+- `src/js/main.js` — applies `'system'` immediately and synchronously on load (no round-trip needed, avoids a flash of the wrong theme for the common case); loads and applies the real stored preference once signed in; resets to `'system'` on sign-out (so a shared/public device never carries a previous teacher's explicit choice into the next session).
+
+### Breaking Changes
+None. Light mode (the only theme that existed before this phase) was verified pixel-identical throughout — every fix and addition either touches only the new dark-theme code path or corrects a bug that dark mode itself introduced.
+
+### Regression Verification
+Full Playwright pass: theme selector renders and defaults to System for a new account; explicit Light/Dark selection applies immediately and updates `data-theme`; the System `matchMedia` listener correctly follows a live OS-level change and correctly stops following once an explicit choice is made; the preference persists across sign-out/sign-in (same account); Phase 5's contrast fix confirmed holding under dark theme (`Start Class Mode` button text stays `#1a1a1a` in both themes, not flipping); a full feature regression (Settings, Notebook Tracker, Class Mode, Recognition Screen) run entirely in dark mode, zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Two theme-independent token *pairs* now exist** (`--color-on-brand` from this correction, `--color-chrome-bg`/`--color-chrome-text` from the second bug) — both follow the same principle: anything whose background color doesn't change between themes (a brand-color fill, a fixed chrome bar) needs text/border colors that don't change either. This is now a named pattern in the token architecture, not a one-off fix, should a third such case appear later.
+- **`themeService.js` and `themePreferenceService.js` were kept as two files**, not merged, even though Phase 6A only exists because of that persistence — resolving/applying a theme has zero need to know about Firestore, and a future non-Firestore context (e.g. a future settings-export feature) would only need the persistence half rewritten.
+- **The System `matchMedia` listener is torn down and rebuilt on every `applyThemePreference()` call**, rather than persisting across preference changes — simpler to reason about than tracking whether a listener is "already this one," at the cost of a trivial amount of redundant setup on each explicit Light/Dark switch.
+
+### Future TODOs
+- Phase 6B — Workspace Personalization (drag-and-drop reordering, widget visibility) begins next, as already scoped and approved separately.
+- A pre-existing, out-of-scope observation surfaced while computing dark-mode contrast: `--color-danger` text on the *light*-mode surface measures 3.8:1, itself already under the 4.5:1 AA requirement (predates this phase entirely — not introduced by it, and dark mode's equivalent pairing at 4.12:1 is not a regression). Worth a dedicated look in a future pass, not fixed here since it's outside Phase 6A's scope.
+- Future theme packs (e.g. a school-branded palette) are now simple additions: a new `[data-theme="pack-name"]` block overriding the same four token names, following the exact pattern `[data-theme="dark"]` established — no component changes required, per the design goal.
+
+---
+
+## Phase 7A — Visual Refresh: Typography, Spacing, Header Hierarchy
+
+**Scope:** the first of three visual-refresh stages, deliberately narrow — general typographic scale application, whitespace rhythm, and header prominence. No card language, no color, no Recognition-specific redesign (all explicitly deferred to 7B/7C, per the approved reorder). Every existing workflow, navigation path, and widget position is unchanged — confirmed by explicit order-preservation checks, not just assumed.
+
+### Features Added — Stage 1 (Typography)
+The `--text-*`/`--font-weight-*` scale (defined but underused since Phase 5) applied across the app:
+- Section labels (`TEACHING`/`CLASSROOM`): → `--text-xs`.
+- Widget titles: → `--text-lg`, with `--font-weight-bold` now explicit (previously relied on the browser's default `<h2>` boldening).
+- Widget subheadings, header subtitle: → `--text-sm`.
+- **New shared `.stat-number` utility** — isolates a single "hero" number from its surrounding sentence so the number, not the whole line, carries visual weight. Deliberately *not* applied to Leaderboard rows or Pending Task counts (both stay compact/list-style, per the design review's data-density guidance for those specific contexts) — only to genuinely standalone stat displays.
+- Applied `.stat-number`-equivalent sizing (`--text-2xl`) to: Weekly Snapshot's total-stars figure (required a small, scoped DOM change — wrapping the number in its own `<span>`, since it was previously embedded directly in a sentence), the Recognition Card's stat, and Student Profile's stat card values (both already isolated in their own elements — pure CSS, no structural change needed).
+
+### Features Added — Stage 2 (Spacing rhythm)
+- New `.dashboard-view__group` wrapper: groups Recognition Wall and Weekly Snapshot (both answering "what should I celebrate") with a smaller internal gap (`--space-3`), distinct from the larger gap (`--space-6`, up from a uniform `1rem`) between different Dashboard questions. Whitespace itself now communicates grouping, rather than relying solely on the small gray section labels.
+- **Same widgets, identical order** — confirmed via an explicit heading-order check before and after, not assumed from the diff being "just a wrapper."
+
+### Features Added — Stage 3 (Header hierarchy)
+- Classroom title (`.tracker-header__title`): `1.3rem` → `--text-2xl` (`1.75rem`) — a deliberate size increase, giving the header genuine visual weight distinct from widget content, per the design review's specific critique that the title and a widget heading were nearly indistinguishable in weight.
+
+### Files Modified
+- `src/css/styles.css` — typography scale applied to the selectors above; `.stat-number` utility added; `.dashboard-view__content`/`.dashboard-view__group` spacing; header title size.
+- `src/js/ui/components/WeeklySnapshotWidget.js` — total-stars figure restructured into its own `<span class="stat-number">`.
+- `src/js/ui/views/DashboardView.js` — Recognition + Weekly Snapshot wrapped in `.dashboard-view__group` (assembly/spacing change only — no widget added, removed, or reordered).
+
+### Breaking Changes
+None. Every change is either a pure tokenization (identical resulting values: header subtitle, section/widget subheadings) or a disclosed, deliberate visual increase explicitly called for in the approved design review (widget headings, header title, stat numbers, group spacing) — none accidental, none affecting workflow or navigation.
+
+### Regression Verification
+Computed-value checks after each of the three stages (font-sizes confirmed in pixels via `getComputedStyle`, not just visual inspection) plus a full feature regression before closing the phase: Settings/Groups/Students/Notebook config, Notebook Register + Timeline, Class Mode + return-to-Dashboard, Recognition Screen + period switching, and Phase 6A's Dark theme toggle — all confirmed working, zero page errors.
+
+### Architectural Decisions Made During Implementation
+- **The Recognition Card's stat size increase (1.4rem → --text-2xl) was placed in 7A, not deferred to 7B**, despite Recognition otherwise being scoped to 7B (Recognition language) — because it's an instance of the *general* "stat numbers get real prominence" typography rule from the approved review table, not a Recognition-specific redesign decision. Recognition's *hierarchy inversion* (winner name becomes bigger than the category label) remains explicitly deferred to 7B, where Recognition's own design language is established.
+- **`.stat-number` was deliberately scoped narrow** — applied only to standalone hero figures, not list-row numbers — directly implementing the design review's explicit distinction between "hero stat" and "GitHub-style dense list" contexts, rather than a blanket size bump everywhere a number appears.
+- **Grouping was implemented via a new wrapper element, not CSS sibling-selector tricks** — a `.dashboard-view__group` div is simpler to reason about and verify (a direct DOM query for "how many widgets are in this group") than a `:nth-child`-based spacing hack, at the cost of one additional, clearly-documented wrapper in `DashboardView.js`.
+
+### Future TODOs
+- Phase 7B — intent-based component language, Recognition's own design language, buttons, forms, empty states.
+- Phase 7C — illustrations, micro-interactions, loading treatment, final polish.
+- (Carried over, unchanged): Phase 6B Workspace Personalization; the pre-existing light-mode danger-contrast observation from Phase 6A; Student Dashboard preview; printable certificates; Teacher's Choice service; Perfect Attendance data source; Student/Parent onboarding.
+
+---
+
+## Phase 7B — Visual Refresh: Intent-Based Component Language
+
+**Scope, and how it changed mid-flight:** originally scoped as abstract intent categories (Action/Celebrate/Insight/Navigation/Utility) mapped to visual weight and color. Before implementation, a design-review checkpoint (prompted by reference images the user shared) sharpened this into concrete, distinct *shapes* per widget — not just color/weight variation on a shared card template. The refined brief: "if I removed the colors entirely, could I still tell Recognition from Pending Tasks from Groups?" Every widget below was redesigned around a shape unique to it, confirmed via that grayscale test, then implemented. Dark mode was required to *reinterpret* each shape (a glow instead of a ring, a lit path instead of a recolored line), not simply recolor it — per an explicit product principle established before implementation began.
+
+### Features Added — Recognition (feel: warm)
+- Avatar redesigned as the app's single most distinct shape: 3rem (compact: 2rem), ring-bordered (2px solid accent), tinted accent background (`color-mix()`, 14% accent into surface).
+- **Winner name now the largest, boldest text on the card** (`--text-lg`/black), inverting the previous hierarchy where the category label outweighed the person being celebrated.
+- **Dark mode**: the ring becomes a soft glow (`box-shadow` bloom) rather than a recolored border — the one glow effect anywhere in the app, deliberately not reused elsewhere so it stays meaningful.
+- **A real contrast bug found and fixed before it shipped**: the tinted background darkens in dark mode (since it's mixed with `--color-surface`, which flips), so pairing it with the theme-*independent* `--color-on-brand` token (correct for a *solid* accent fill, wrong for a *tinted* one) would have produced 1.43:1 contrast — verified numerically, corrected to the theme-flipping `--color-ink` (10.84:1 in dark mode).
+
+### Features Added — Weekly Snapshot (feel: editorial)
+- Leaderboard rows restructured into a plain, hairline-divided list (rank / name / value columns) — no avatars, no icon-driven content, reading like a small report rather than a UI panel.
+- **Dark mode**: the widget's card border and background are removed entirely (`.dashboard-widget--editorial` under `[data-theme="dark"]`) — content sits directly on the page, leaning *further* into "editorial" rather than just recoloring the same panel.
+
+### Features Added — Pending Tasks (feel: actionable)
+- Every row restructured into a checklist shape: a leading checkbox glyph (☐) and trailing chevron (›) on every item — the row itself signals "tap to act," independent of its text.
+- The Phase 5 success/collapse resolution animation (a separate, unrelated CSS class) confirmed still working correctly after this restructure.
+
+### Features Added — Subjects (feel: navigational)
+- Redesigned as a "waypoint list": chips connected by a thin line, trailing chevron — a path/breadcrumb metaphor, since this widget's entire job is navigating into Notebook Tracker.
+- **Dark mode**: the connecting line gets an accent tint ("a lit path at night") rather than a plain recolor.
+
+### Features Added — Groups (feel: collaborative)
+- Redesigned as overlapping avatar clusters ("huddles") — up to 3 small circular initials avatars per team, overlapping, with a "+N" overflow badge — instead of a text chip. A group now visually reads as "a cluster of people" before any label is read.
+
+### Features Added — Buttons & Forms
+- **Buttons**: Primary buttons now carry genuine size distinction (larger padding, 10px radius, `--text-base`) from Ghost/Text buttons — priority is felt through size, not only color, addressing the original design review's specific critique.
+- **Forms**: inputs/selects gained consistent baseline styling (border, radius, background — previously relying entirely on browser defaults beyond font) plus a subtle background tint on focus, alongside the pre-existing accessibility outline (confirmed via direct testing that keyboard `:focus-visible` still shows the yellow ring correctly; Chromium's standard behavior of treating all text-input focus as focus-visible was verified, not assumed, to be pre-existing browser behavior rather than a regression this phase introduced).
+
+### Features Added — Empty States
+Revised per the approved emotional-language table — Celebrate/Insight/Navigation/Collaborative widgets get warmer, more inviting copy (Recognition: *"The week is just getting started — recognitions will appear here soon"*; Weekly Snapshot: *"No stars awarded yet — plenty of week left"*; Subjects/Groups: invitations to configure, not flat statements). Genuine error/not-found states elsewhere in the app (Utility-intent, per the design principle) were deliberately left unchanged — richer copy there would fight the "disappears into the background" goal, not serve it.
+
+### Files Modified
+- `src/css/styles.css` — new design-language rules for all five widgets (`.recognition-card__avatar`, `.editorial-list`, `.checklist`, `.waypoint-list`, `.huddle-list`), button/form updates, dark-mode reinterpretation rules for each.
+- `src/js/ui/components/RecognitionCard.js` — no structural change (CSS-only); `WeeklySnapshotWidget.js`, `PendingTasksWidget.js`, `SubjectsWidget.js` — restructured list-row markup to support the new shapes; `GroupsWidget.js` — rewritten for the huddle-cluster structure.
+- `src/js/ui/components/ContinueWorkingWidget.js`, `RecognitionWidget.js`, `src/js/ui/views/RecognitionScreenView.js` — empty-state copy only.
+
+### Breaking Changes
+None. Every widget's click-through navigation, data source, and underlying service calls are unchanged — confirmed via a full regression pass (Settings, Notebook Tracker via the new waypoint chips, Class Mode, Recognition Screen with period switching, Groups via the new huddle rows) with zero page errors, run in both light and dark theme.
+
+### Regression Verification
+Computed-value and behavioral checks after each widget (avatar size/contrast in both themes; hairline list structure and dark-mode borderless behavior; checklist glyphs and click-through plus the Phase 5 resolution animation confirmed still intact; waypoint connector count and dark-mode tint; huddle avatar count including overflow badge and click-through) — followed by one full end-to-end regression pass across the whole app before closing the phase.
+
+### Architectural Decisions Made During Implementation
+- **The scope changed after design review, and that change is recorded here rather than glossed over**: the original abstract intent-category plan was superseded by concrete per-widget shapes before any CSS was written, following a design-review checkpoint the user initiated mid-phase. Implementation proceeded once both open questions from that checkpoint (whether the warmth level stayed "restrained," and whether this refined or replaced the original 7B scope) were explicitly resolved.
+- **Exactly one glow effect exists in the whole app** (Recognition's avatar ring in dark mode) — deliberately not generalized into a reusable "glow" utility class, so it stays a meaningful, singular signal rather than becoming decorative wallpaper if reused elsewhere.
+- **`color-mix()` is used for tinted backgrounds** (Recognition's avatar, Groups' huddle avatars, Subjects' dark-mode connector) rather than precomputed static hex values — this keeps every tint correctly derived from the existing semantic tokens (`--color-accent`, `--color-primary`, `--color-surface`) rather than introducing new hardcoded colors that would need their own separate dark-mode variants.
+- **Genuine error/not-found empty states were deliberately left untouched**, even though richer copy was applied to the five Dashboard widgets — per the emotional-language table's explicit Utility-intent rule, warming up an error message would work against "disappears into the background," not serve it.
+
+### Future TODOs
+- Phase 7C — illustrations, micro-interactions, loading treatment, final polish.
+- (Carried over, unchanged): Phase 6B Workspace Personalization; the pre-existing light-mode danger-contrast observation from Phase 6A; Student Dashboard preview; printable certificates; Teacher's Choice service; Perfect Attendance data source; Student/Parent onboarding.
+
+---
+
+## Visual Refresh — Emotional Palettes, Hero, Color as Hierarchy
+
+**Context and a genuine mid-course correction:** Phases 5–7B optimized for "calm, restrained, one accent" — modeled on Linear/GitHub, right for a teacher glancing at a dashboard between classes. A review checkpoint surfaced that this app is also *projected in front of students all day*, which is a different design problem: the interface read as efficient but emotionally flat, and dark mode specifically felt like "gray cards on a gray background." This phase revises the color philosophy accordingly — restraint in *motion* and *typography* stays (no confetti, no bounce, no gamified medals), but color itself becomes part of the information hierarchy rather than a single sparing accent.
+
+### Features Added
+- **Five named emotional palettes** (`Celebrate`, `Learn`, `Focus`, `Growth`, `Community`), each a reusable token pair (a subtle background wash + a contrast-verified label-text color), not a color a section owns outright. Sections *consume* a palette, which is what makes it possible for the same emotional identity to travel to a downstream screen at a different intensity without inventing a new color system each time.
+- **Every hue is a real TFI brand color, none invented**: Celebrate = Orange (already `--color-accent`), Learn = Cyan (already `--color-primary`), Focus = Yellow (already `--color-warning`), Growth = Lime Green (already `--color-success`), Community = **Pink** — defined in the brand guide since Phase 5 but never actually used anywhere until now.
+- **One wash per widget container, not per sub-element** — "let the cards breathe": Recognition's avatar, Weekly Snapshot's leaderboard rows, Pending Tasks' checklist glyphs, Subjects' waypoint chips, and Groups' huddle avatars all stay neutral; only the outer card carries the palette tint. Each widget's heading text also picks up its palette's verified label color, reinforcing identity without adding new UI elements.
+- **A real Hero**, replacing the Dashboard header's previously-plain classroom-context text: a greeting (first name, extracted from the signed-in teacher's display name), classroom name, grade/school, and a conditional motto slot. Deliberately timeless — no live stats or pending counts, which stay in their own widgets below; confirmed by testing the rendered Hero text contains no digits beyond the classroom's own name/grade.
+- **Recognition Screen's active category-chip state** now consumes the Celebrate accent (Orange) instead of generic primary Cyan — since this screen is Recognition's dedicated home, its active state should carry Recognition's own identity at a higher intensity than the Dashboard widget's lighter touch.
+
+### A disclosed revision of a very recent decision
+Phase 7B gave Weekly Snapshot's dark-mode card full transparency (background and border both removed, "text on the page") to reinforce its editorial feel. That directly worked against *this* phase's goal: a fully transparent card carries no color signal at all in dark mode, reintroducing exactly the "no color in dark mode" problem this phase exists to fix. Reverted to carrying the Learn wash like every other palette/theme combination — border and shadow still removed (keeping a little of the original "quieter than a bordered card" intent), but the background is no longer invisible.
+
+### Files Created
+None — this phase extended existing files rather than adding new ones.
+
+### Files Modified
+- `src/css/styles.css` — raw `--color-pink` added to the palette; five `--palette-{name}-wash`/`--palette-{name}-label` token pairs (light + dark values) added; `.dashboard-widget--{celebrate,learn,focus,growth,community}` wash classes added; Weekly Snapshot's dark-mode rule revised; Hero CSS (`.classroom-hero__greeting`, `.classroom-hero__motto`) added; Recognition Screen's active-chip color changed from primary to accent.
+- `src/js/ui/components/RecognitionWidget.js`, `WeeklySnapshotWidget.js`, `PendingTasksWidget.js`, `SubjectsWidget.js`, `GroupsWidget.js` — one added CSS class each (no structural changes).
+- `src/js/ui/views/DashboardView.js` — classroom-context slot rebuilt into the Hero (greeting + conditional motto); new `getFirstName()` helper.
+
+### Breaking Changes
+None. `classroom.motto` is read defensively (`if (classroom.motto)`) and doesn't exist as a field on any classroom yet — the Hero's motto slot is forward-compatible for a future phase, not active functionality today. Every other change is additive CSS classes or a content upgrade to an existing slot.
+
+### Regression Verification
+Contrast for all 10 palette/theme label-text combinations computed and verified (6.53:1–9.9:1, all comfortably above the 4.5:1 requirement) *before* any CSS was written, not after. Computed-value checks confirmed all five widgets render distinct wash colors and Weekly Snapshot's dark-mode background is no longer transparent. Hero tested for correct greeting text, absent motto element (no data source yet), and no leaked live-stat digits. A full feature regression (Settings, Notebook Tracker via the Growth-tinted Subjects widget, Class Mode, Recognition Screen) confirmed zero errors in both themes.
+
+### Architectural Decisions Made During Implementation
+- **Classroom Identity ("Classroom Culture") was explicitly kept out of this phase** and broadened, per direction, into its own future phase — banner, motto, color, theme, mascot, and teacher customization together, not just a color picker. The Hero's motto slot was built to accommodate that phase without pre-building any part of it now (no new classroom field, no Settings UI).
+- **The Hero does not introduce a sixth ad-hoc color wash.** Its warmth comes from content and typography (a personal greeting, real hierarchy) rather than another background tint competing with the five section palettes — keeping the palette system to exactly five meaningful colors rather than diluting it.
+- **Wash intensity was tuned down from the original concept mockup** (roughly 12–14%) to a verified-subtle 6% (light) / 10% (dark) — per explicit direction to keep the dashboard "bright and breathable" while still giving each section a distinct identity, confirmed distinguishable via the computed background-color checks.
+
+### Future TODOs
+- Extend palette-travel further downstream: a light Growth touch on Notebook Tracker's active tab, a light Community touch on Settings > Groups' section heading — scoped as the next natural step, not completed this pass.
+- Classroom Culture (its own future phase): banner, motto, color, theme, mascot, teacher customization — data model and teacher-choice-vs-auto-assign question deliberately left open for that phase's own design pass.
+- Phase 7C — illustrations, micro-interactions, loading treatment, final polish.
+- (Carried over, unchanged): Phase 6B Workspace Personalization; the pre-existing light-mode danger-contrast observation from Phase 6A; Student Dashboard preview; printable certificates; Teacher's Choice service; Perfect Attendance data source; Student/Parent onboarding.
+
+---
+
+## White Canvas Revision — Color as Emphasis, Not Background
+
+**Context:** a direct reversal of the previous Visual Refresh phase's core mechanism (a wash tinting each widget's entire card background), in favor of "white is the primary canvas; color is reserved for moments that deserve attention." The five named palettes (Celebrate/Learn/Focus/Growth/Community) and their tokens from the prior phase are kept — what changes is *how* each is applied: never as a full-card fill, always as a targeted accent (a border, an icon, a badge, a hover state, one dedicated KPI card).
+
+### Features Added
+- **Full-card washes removed** from all five Dashboard widgets. Cards are white/surface in both themes; the palette tokens (`--palette-*-wash`, `--palette-*-label`) remain defined and are now used only for targeted accents, not backgrounds.
+- **Borders reduced in favor of soft elevation**: `.dashboard-widget`'s visible border replaced with a transparent border + `box-shadow`. This surfaced a real problem, caught and fixed rather than shipped: the existing shadow value is a *dark* shadow, nearly invisible against an already-dark page in dark mode. Added dark-mode-specific elevation values (`--elevation-card/hover/sheet/dialog`) with a thin top highlight plus a stronger, more opaque shadow — verified visible via computed-style checks, not assumed.
+- **Recognition**: avatar's tinted fill removed — now white with only the orange ring as the accent ("orange accents only").
+- **Weekly Snapshot**: the headline stat now lives in a dedicated `.kpi-card` — one bold, colored sub-element on an otherwise white surface, replacing the previous full-card Learn wash. This is the concrete "contrast creates hierarchy" example: the KPI card earns attention precisely because everything around it stays white.
+- **Pending Tasks**: the Focus/amber accent moved from a static card background into a row-level hover interaction — a checklist row's background and icon colors tint amber only on hover, not at rest.
+- **Subjects**: dropped the previous Growth/Lime Green mapping in favor of cyan indicators, per this phase's explicit direction — a persistent small cyan dot on each waypoint chip, plus the existing cyan hover-border. Flagged directly during implementation as a real departure from the prior phase's approved palette assignment (Growth had been mapped to Teaching/Subjects), not a silent change.
+- **Groups**: avatars now cycle through three distinct hues (cyan, orange, pink tints) for genuine visual variety within a huddle, instead of one uniform tint; the card gained a pink top border, matching Recognition's established accent-border pattern.
+- **Hero**: given a soft two-stop gradient (Celebrate → Community, both very light) — an explicit, narrowly-scoped exception to this project's long-standing "no gradients" convention (Phase 5 onward), justified specifically because the Hero is meant to be "the strongest visual treatment," a landing moment rather than everyday UI chrome. Documented in-file as a deliberate exception, not an unnoticed drift from the rule.
+
+### Files Modified
+- `src/css/styles.css` — border-to-elevation change on `.dashboard-widget`; dark-mode elevation overrides; all five wash-background rules removed (heading-tint and accent-border rules kept); Recognition avatar fill removed; `.kpi-card` added; checklist row hover interaction added; waypoint chip indicator dot added; huddle avatar color variety added; Groups' pink border added; Hero gradient added.
+- `src/js/ui/components/WeeklySnapshotWidget.js` — headline stat restructured into the new KPI card markup.
+- `src/js/ui/components/SubjectsWidget.js` — `dashboard-widget--growth` class removed.
+
+### Breaking Changes
+None functionally — every navigation path, click-through, and data flow is unchanged. Visually, this is a significant, intentional reversal of the immediately preceding phase's wash system, confirmed via computed-style checks that cards are genuinely white/surface again in both themes (not just visually similar).
+
+### Regression Verification
+Computed-style checks confirmed: Recognition, Weekly Snapshot, and Groups cards are white/surface in light mode and the correct dark surface color in dark mode (not tinted); the KPI card is the only colored element within Weekly Snapshot; huddle avatars show three genuinely different colors; Groups' border-top is exact TFI Pink; dark-mode card shadows are present and non-trivial (the bug caught above). A full regression pass — Settings, Notebook Tracker via the Subjects waypoint navigation, Class Mode, Recognition Screen (including its Celebrate-orange active chip) — confirmed working in both light and dark mode with zero page errors.
+
+### Architectural Decisions Made During Implementation
+- **A real dark-mode elevation bug was caught proactively, before any screenshot revealed it** — recognizing that "reduce borders, rely on shadow" is a well-known dark-mode failure mode (a dark shadow reads as nothing against a dark canvas) and verifying rather than assuming the existing shadow values would still work.
+- **The Subjects palette reassignment (Growth → cyan) was flagged explicitly during implementation**, not silently applied, since it contradicts a mapping approved just one phase earlier. Cyan was chosen because it's already the app's established navigation/interactive color everywhere else, making "Subjects consumes the general navigation color" a more coherent rule than forcing a dedicated emotional palette onto every section.
+- **The Hero's gradient is the one and only exception to the no-gradients rule in the entire app** — deliberately not a precedent for introducing gradients elsewhere; every other surface stays flat, per the white-canvas principle.
+
+### Future TODOs
+- (Unchanged from the prior phase's list): downstream palette travel to Notebook Tracker/Settings > Groups; Classroom Culture as its own future phase; Phase 7C polish; Phase 6B Workspace Personalization; and all previously-carried-over items.
+
+---
+
+## White Canvas Refinement — Solid Accents, Not Pale Washes
+
+**Context:** the user resent the reference image that was missing from an earlier message. Reviewing it directly identified two remaining pale washes in the just-shipped White Canvas revision that didn't match the reference's actual boldness: the KPI card (a light Learn-palette tint) and the Hero (a soft 10–12% gradient). The reference's own "Attendance" element is a *fully saturated* solid color block with bold white text — not a pale tint — and its illustrated banner is confidently, not faintly, colored.
+
+### Features Added
+- **KPI card converted from a pale wash to a solid, fully-saturated fill** (`--color-primary`, TFI Cyan) — matching the reference's "Attendance" box exactly. Text reuses the already-verified `--color-on-brand` pattern (white text on this cyan measures 2.17:1 and fails WCAG AA, per Phase 5's original finding; on-brand ink measures 8.0:1).
+- **Hero gradient boosted from a 10–12% tint to a confident 55% saturation** (35% in dark mode) — a real, bold gradient rather than a barely-there wash, matching the reference banner's presence.
+
+### A contrast bug caught before shipping, not after
+Boosting the Hero's saturation meant `--color-muted` (used for the greeting/subtitle/motto) no longer had sufficient contrast — computed at every saturation level tested (30–80%), muted measured 2.43–4.88:1 against the gradient's stops, failing WCAG AA's 4.5:1 requirement throughout. Switched all Hero text to `--color-ink` instead, which passes comfortably at every level checked (6.58–13.21:1). A second, related check: dark mode's *flipped* (light) ink against light mode's 55% saturation left one gradient stop at 4.47:1 — marginal, under the requirement. Solved by giving dark mode its own lower percentage (35%), verified at 6.89:1/8.51:1 on both stops — computed and confirmed via `getComputedStyle`, not assumed from the light-mode fix carrying over.
+
+### Files Modified
+- `src/css/styles.css` — `.kpi-card`/`.kpi-card__number`/`.kpi-card__label` converted to solid-fill + on-brand text; `.classroom-hero` saturation increased with a dark-mode-specific override; Hero text color rules added (`--color-ink` instead of `--color-muted`).
+
+### Breaking Changes
+None. Purely a saturation/contrast refinement of elements shipped one phase earlier — no structural, navigation, or data changes.
+
+### Regression Verification
+Computed-style checks confirmed: KPI card background is exact TFI Cyan, its number text is exact dark ink; Hero greeting text is dark ink in light mode and correctly flips to light ink in dark mode. A full regression pass (Settings, Notebook Tracker via Subjects waypoint navigation, Class Mode, Recognition Screen, dark theme toggle) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Every saturation/contrast decision in this entry was computed before being written into CSS**, including the dark-mode-specific gradient percentage — this phase's two fixes (KPI card, Hero) were both caught by direct comparison against the reference image the user provided, not guessed at from written instructions alone.
+- **The reference's principle — one confidently solid box per screen, everything else plain — was applied narrowly to the KPI card only**, not extended to Recognition/Groups/Pending Tasks/Subjects, which stay in the accent-border/hover/indicator treatment established in the prior phase. A future pass could consider whether any other widget deserves a solid "hero box" moment, but that wasn't asked for here and wasn't added speculatively.
+
+### Future TODOs
+- (Unchanged from the prior phase's list): downstream palette travel to Notebook Tracker/Settings > Groups; Classroom Culture as its own future phase; Phase 7C polish; Phase 6B Workspace Personalization; and all previously-carried-over items.
+
+---
+
+## Hero Refinement — Cooler Gradient, Hue-Derived Text
+
+**Context:** direct feedback against a screenshot of the shipped Hero — cooler gradient tones, white text where the background is genuinely dark, and for lighter backgrounds a darkened *shade of the ambient gradient color* rather than flat black/`--color-ink` ("soft on the eyes").
+
+### Features Added
+- **Gradient hue changed** from the warm Celebrate/Community pairing (orange→pink) to a cooler Learn/Growth pairing (cyan→lime green) — same tokens, different pair, per explicit direction to move away from warm tones.
+- **Light-mode text is now a darkened tint of the gradient's own hue** (`color-mix(in srgb, var(--color-primary) 25%, black)` — a deep teal), not generic `--color-ink`. Verified at 8.96:1/10.13:1 against the gradient's two light-mode stops — comfortably passing and clearly "softer" than flat black while remaining unambiguous.
+- **Dark-mode text is white**, since dark mode's stops are genuinely dark (mixed into a dark surface rather than a light one) — verified at 7.66:1/6.97:1.
+- Applied consistently across every text element in the Hero, including the classroom title itself (caught during implementation: the title had no explicit color rule and would otherwise have kept inheriting plain `--color-ink`/white while the greeting and subtitle picked up the new hue-tinted treatment — a visible inconsistency avoided before it shipped, not after).
+
+### Files Modified
+- `src/css/styles.css` — `.classroom-hero`'s gradient stops changed to Learn/Growth; light- and dark-mode text-color rules rewritten around the hue-derived approach described above.
+
+### Breaking Changes
+None. Purely a color/contrast refinement of the Hero shipped in the immediately preceding phase.
+
+### Regression Verification
+Computed-style checks confirmed the classroom title and greeting both render the exact darkened-teal value in light mode, and pure white in dark mode. A full regression pass (Class Mode, Recognition Screen, theme switching) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The "darkened ambient hue" text color is derived from `--color-primary` specifically** (the gradient's first/cyan stop), applied uniformly across the whole gradient rather than varying per-stop — CSS has no clean way to vary text color continuously across a gradient's span, so one representative, verified-safe color was chosen and checked against *both* stops rather than just the one it was derived from.
+- **Caught and fixed a real inconsistency before shipping**: the classroom title lacked its own color rule and would have silently kept the old (or default) text color while sibling elements in the same Hero picked up the new treatment — found by explicitly checking each Hero text element's rule, not assumed from having fixed the greeting/subtitle.
+
+### Future TODOs
+- (Unchanged from the prior phase's list): downstream palette travel to Notebook Tracker/Settings > Groups; Classroom Culture as its own future phase; Phase 7C polish; Phase 6B Workspace Personalization; and all previously-carried-over items.
+
+---
+
+## Recognition Showcase, Rank Graphics, and Dark Mode Removal
+
+**Context:** direct feedback against two fresh screenshots — the KPI card still showed flat dark text rather than the "soft" hue-derived treatment just applied to the Hero; the Recognition Wall needed more visual presence; leaderboard ranks read as plain "#1"/"#2"/"#3" text; and, separately, a decision to remove the theme system entirely and keep exactly one visual theme.
+
+### Features Added
+- **KPI card text** now uses the same darkened-hue-tint principle as the Hero (`color-mix(in srgb, var(--color-primary) 25%, black)`) instead of flat `--color-on-brand` black — verified at 6.5:1 against the card's full-saturation cyan background.
+- **Recognition Wall showcase**: the widget's own background is now the app's one fixed dark tone (`--color-chrome-bg`, already used for the persistent top bar), with each `.recognition-card` given an explicit white background so it visibly pops against the dark surround — a "display case" effect, distinct from every other widget's plain white card. Heading text and the "View All" link both switch to the fixed light chrome-text color for this dark context.
+- **Leaderboard rank graphics**: 🥇🥈🥉 replace the "#1"/"#2"/"#3" text for the top three ranks, in both places a leaderboard renders (`WeeklySnapshotWidget.js` and the shared `LeaderboardList.js`, used by the Recognition Screen) — ranks 4 and beyond keep plain "#N" text, since no widely-recognized graphic exists past bronze. Ties at a rank all correctly receive that rank's medal (e.g. a four-way tie at rank 3 shows four bronze medals) — this is accurate, not a bug, since every tied student genuinely holds that rank.
+- **Dark mode removed entirely**, per explicit direction: the Light/Dark/System selector is gone from `UserBar.js`; `main.js` no longer resolves, applies, loads, or persists any theme preference. The app now has exactly one visual theme.
+
+### Files Modified
+- `src/css/styles.css` — KPI card text color changed; Recognition Wall dark-background rules added (reusing existing chrome tokens, no new colors introduced).
+- `src/js/ui/components/WeeklySnapshotWidget.js`, `LeaderboardList.js` — added the same small `formatRankDisplay()` helper (medals for top 3, plain text beyond) to each file's rank-rendering code.
+- `src/js/ui/components/UserBar.js` — theme selector removed entirely; simplified to avatar/name/Sign Out only.
+- `src/js/main.js` — all theme-related imports, state (`currentTheme`), functions (`handleSelectTheme`), and calls (`applyThemePreference`, `getPreferenceOnce`, `setPreference`) removed from `init()` and both `renderUserBar()` call sites.
+
+### Breaking Changes
+None functionally. Visually, this removes a feature (theme switching) entirely, per explicit direction — anyone who had switched to Dark will simply see the one remaining (light) theme from now on.
+
+### A disclosed, deliberate scoping choice
+`services/themeService.js` and `services/themePreferenceService.js` (and the corresponding repository methods, `getThemePreferenceOnce`/`setThemePreference`) were **not deleted** — they're simply no longer imported or called anywhere. Removing them fully would mean also touching the repository interface and its Firestore implementation for a purely cosmetic cleanup with real (if small) risk of breaking something for no functional gain. Flagging this clearly rather than silently leaving unexplained dead code: a future pass could remove these files entirely if a fully clean repository is wanted, but it wasn't done as part of this change.
+
+### Regression Verification
+Computed-style checks confirmed: the theme selector no longer renders; the KPI card's number renders the exact darkened-teal value; the Recognition Wall's background is exact `#1a1a1a` while its child cards remain exact white; both leaderboard locations (Weekly Snapshot and the Recognition Screen) render medal emoji for top ranks. A full regression pass (Settings, Notebook Tracker, Class Mode, Recognition Screen) confirmed zero errors — with no theme toggle to test against anymore, since it no longer exists.
+
+### Architectural Decisions Made During Implementation
+- **The Recognition Wall's dark background reuses the app's one existing fixed-dark tone** (`--color-chrome-bg`/`--color-chrome-text`, originally built for the persistent top bar in Phase 6A) rather than introducing a new dark color — keeping the app's "dark tone vocabulary" to exactly one deliberate value, used in exactly two now-related places (the top bar, and this showcase).
+- **The rank-formatting helper was duplicated in two files rather than centralized**, matching this project's established pattern of small, single-purpose per-file helpers (e.g. `getInitials` appears in more than one component already) rather than introducing a new shared-utilities module for a four-line function.
+
+### Future TODOs
+- (Unchanged from the prior phase's list): downstream palette travel to Notebook Tracker/Settings > Groups; Classroom Culture as its own future phase; Phase 7C polish; Phase 6B Workspace Personalization; and all previously-carried-over items. Additionally: consider a full removal of the now-unused theme service files/repository methods in a future cleanup pass, if a fully clean codebase (not just an unused-but-harmless one) is wanted.
+
+---
+
+## Recognition Gold, Reliable Rank Badges, Graphic Task Icons
+
+**Context:** direct feedback against two more screenshots — no more black text anywhere ("matching color text" instead), a request to move Recognition off orange entirely (with alternatives requested, not just a silent swap), a real visibility concern with the medal emoji used for ranks, a request to make the avatar circles "pop" with color rather than a subtle ring, and a complaint that the checkbox+emoji combination in Pending Tasks read as "an excel sheet."
+
+### A color decision, presented rather than made silently
+Per explicit request for suggestions: two alternatives were presented — **deep gold/amber** (ties to the trophy/star imagery already in Recognition) and **royal purple** (a completely new hue, more ceremonial). Implemented with gold as the recommendation, flagged clearly as swappable if purple is preferred instead.
+
+### Features Added
+- **`--color-accent` redefined to gold** (`#c9971f`, a new `--color-gold` raw token) instead of orange — this single change correctly cascades through every existing Recognition/Celebrate-palette reference (border accents, avatar ring, glow, Recognition Screen's active chip) without needing to touch each one individually. One disclosed side effect: Groups' huddle avatars cycle through 3 colors including `--color-accent` for variety — that one avatar shifts from orange-tinted to gold-tinted, still colorful, not a regression.
+- **Recognition Wall background is now a gradient of dark gold shades** (`color-mix` at 35%/55% into black), not flat black — verified at 11.83:1/7.19:1 with the existing white heading text.
+- **Recognition avatar** changed from a white fill + thin ring to a **bold, rich gold fill** with white text — genuinely colorful rather than a subtle outline, per "I need the circles to pop." 70% gold (not full saturation) keeps white text passing at 4.99:1; pure gold only reaches 2.65:1.
+- **Winner name and stat text** now use a darkened-gold tint (`color-mix` at 55% into black) instead of inheriting flat black/`--color-ink` — verified at 7.19:1 on the card's white background. This is the "matching color text, not black" principle applied to Recognition's two most prominent text elements.
+- **Rank badges replace medal emoji entirely.** Emoji medal rendering is a genuine cross-platform reliability concern (this project already hit an emoji-rendering gap once before, with 📒 falling back to a box glyph in one test environment) — not just an aesthetic one. Replaced with CSS-drawn circular badges (darkened gold/silver/bronze, verified at 4.99:1/4.84:1/6.76:1 with white numerals) in both places a leaderboard renders (`WeeklySnapshotWidget.js` and the shared `LeaderboardList.js`).
+- **Pending Tasks' checkbox and bare emoji replaced with graphic badges**: the per-row indicator is now a CSS-drawn ring (a real graphic element, not a Unicode `☐` character), and the group heading's emoji sits inside a colored circular badge rather than floating bare in the heading text.
+
+### Files Modified
+- `src/css/styles.css` — new `--color-gold` token; `--color-accent` repointed to it; Recognition Wall gradient; avatar fill; winner-name/stat text colors; `.rank-badge` (three color variants); `.checklist__box` redrawn as a CSS ring; `.task-group-heading__icon` badge added; corresponding hover-state fix (the checkbox ring has no text color to change on hover, so hover now fills the ring instead).
+- `src/js/ui/components/WeeklySnapshotWidget.js`, `LeaderboardList.js` — `formatRankDisplay()` (returning emoji text) replaced with `createRankIndicator()` (returning a real badge element) in both files.
+- `src/js/ui/components/PendingTasksWidget.js` — group heading restructured to wrap its icon in a badge span; row indicator no longer sets emoji/Unicode text content (styled entirely via CSS now).
+
+### Breaking Changes
+None. All changes are visual/text-color refinements of features shipped in immediately preceding phases — no navigation, data, or workflow changes.
+
+### Regression Verification
+Computed-style checks confirmed: the wall's `background-image` is a gradient (not a solid color); avatar/winner-name/stat colors all match their computed gold/darkened-gold values exactly; rank badge #1 renders the correct color with "1" as text content, in *both* Weekly Snapshot and the Recognition Screen's leaderboard; the checklist ring and task-group icon badge both render with the expected colors. A full regression pass (Settings, Pending Task click-through, Notebook Register, Class Mode, Recognition Screen) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Every color used for a badge/fill was darkened to a verified-passing shade before being written into CSS** — the pure medal tones (gold/silver/bronze at full saturation) all failed white-text contrast outright (2.5–3.8:1); this was caught by computing it, not by eyeballing a "looks about right" shade.
+- **`--color-accent` was redefined at its single source rather than hunting down every individual orange reference** — this is precisely why the semantic-token architecture (built back in Phase 5) pays off: a "we don't like this color anymore" request becomes a one-line change instead of a file-wide find-and-replace.
+
+### Future TODOs
+- Confirm whether gold or purple is the final Recognition color — implemented with gold, purple remains available if preferred.
+- Consider extending "no black text" further into other widgets (Weekly Snapshot's KPI card and the Hero already use this pattern; Recognition now does too) if more instances of flat black text are found elsewhere.
+- (Carried over, unchanged): downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Blue/White Unification — Deep Blue Solid Fills, Strip Leaderboards
+
+**Context:** direct feedback against a fresh screenshot plus two style references — the Hero title, "Start Class Mode," and the KPI card's "35 stars" all still read as black text over a strong background; a request for leaderboard rows to be visually separated "strips" rather than a continuous hairline-divided list (referencing a ranking-app screenshot); a simple, confident blue-and-white UI held up as the style to aim for; and explicit permission that Recognition's color no longer needs to represent "recognition" specifically, just be appealing.
+
+### The core problem, diagnosed before any color was chosen
+Every previous attempt to fix "black text" had darkened the *text* while leaving the *background* (`--color-primary`, bright cyan) unchanged. Verified numerically: white text on plain cyan measures 2.17:1, and even the existing darker hover variant (`--color-primary-strong`) only reaches 3.58:1 — **no light-colored text can ever pass WCAG AA against this particular background**, because the background itself is too bright. Continuing to search for a lighter-but-still-passing text color was solving the wrong variable. The actual fix: darken the *background*, not the text.
+
+### Features Added
+- **New `--color-primary-deep` token** (`color-mix(in srgb, var(--color-primary) 65%, black)`) — a richer, darker blue that lets text be genuinely white. Verified at 4.81:1.
+- **"Start Class Mode" and every other Primary button** now use this deep-blue fill with white text, replacing the dark-ink-on-bright-cyan pairing. Hover state darkens *further* (55% mix, 6.24:1) rather than lightening — the previous hover target (`--color-primary-strong`) was actually lighter than the new resting state and would have dropped white text back under the contrast threshold; caught and fixed before shipping, not after.
+- **KPI card** ("35 stars awarded this week") switched to the same deep-blue fill + white text.
+- **Hero** switched from a pale pastel gradient with darkened-hue text (which, per direct feedback, still read as "basically black") to a genuinely rich, saturated blue-to-violet gradient with plain white text — verified at 6.24:1/8.51:1.
+- **Recognition Wall unified with the same rich gradient** — per explicit permission that it doesn't need its own "recognition-specific" color, one consistent premium gradient across the app's two most prominent moments (Hero, Recognition Wall) now reads as a deliberate identity.
+- **Recognition avatar** switched from gold to the same deep blue, for cohesion with the now-blue wall; the card's gold border-top accent is kept, creating a "navy + gold" pairing (evoking the dark card + gold medal ribbon in the ranking-app reference) rather than gold competing with the new blue wall.
+- **Leaderboard rows now render as separated "strips"** in both places a leaderboard appears (Weekly Snapshot and the Recognition Screen) — each row gets its own background tint, rounded corners, and spacing, replacing the previous continuous hairline-divided list, directly per the reference screenshot's specific callout.
+
+### Files Modified
+- `src/css/styles.css` — `--color-primary-deep` token added; `.btn--primary` (fill, text, hover) rewritten; `.kpi-card` fill/text rewritten; `.classroom-hero` gradient and text rewritten (dead dark-mode override rules removed as part of this, since dark mode no longer exists); `.dashboard-widget--recognition` gradient rewritten; `.recognition-card__avatar`/`__winner-name`/`__stat` recolored to deep blue; `.editorial-list__row`/`.leaderboard-list__row` restructured from hairline-divided to separated strips.
+
+### Breaking Changes
+None. Every change is a color/background refinement of features shipped in immediately preceding phases — no navigation, data, or structural changes.
+
+### Regression Verification
+Computed-style checks confirmed: the primary button's text is exact white on the exact deep-blue fill; the Hero title is exact white; the KPI card's number is white on deep blue; the Recognition Wall's `background-image` is the new blue-violet gradient; the avatar fill is deep blue while the card's border-top remains gold; leaderboard rows in both locations show the new strip background and spacing. A full regression pass (Settings, Notebook Tracker, Class Mode, Recognition Screen) confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **Diagnosed the actual constraint before choosing any color**: rather than continuing to hunt for a "light enough but still passing" text color against a background whose maximum-possible contrast with white was already known (2.17:1 for white-on-white-equivalent-luminance backgrounds), the fix targeted the correct variable — the background's darkness — which is the only lever that can satisfy both "genuinely light text" and "passes WCAG AA" simultaneously.
+- **A second contrast bug was caught in the same pass, not left for a future report**: the button's hover state would have been *lighter* than its new resting state, silently dropping white text below the threshold on hover specifically. Checking the hover state's contrast, not just the resting state's, is why this was caught now rather than being the next round of feedback.
+- **Recognition and the Hero were deliberately unified onto one gradient formula** rather than each getting its own distinct treatment — per explicit permission that Recognition's color doesn't need its own meaning, and because one consistent "signature gradient" used at the app's two most prominent moments reads as more deliberate than two competing rich-color choices.
+
+### Future TODOs
+- Confirm whether gold or purple is still worth offering as a Recognition-specific accent option, now that the wall itself is unified with the Hero's blue-violet gradient — currently the border-top/rank-badge gold accents are the only remaining Recognition-specific color signal.
+- (Carried over, unchanged): downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Specified Gradient, Strip-Style Leaderboard Badges, Collapsible Pending Tasks
+
+**Context:** an exact gradient specification (`linear-gradient(to top, #4481eb 0%, #04befe 100%)`), leaderboard numbering references drawn from infographic-style "numbered strip" designs, and a request to make Pending Tasks neater via an expandable button rather than always showing every item inline.
+
+### A contrast failure found in the exact colors specified, resolved without abandoning them
+Checked before implementing, per this project's standing practice: the gradient as given fails white-text contrast on **both** stops (3.76:1 and 2.14:1 — well under the 4.5:1 requirement). Rather than silently substituting different colors, or silently shipping an inaccessible gradient, both stops were darkened by the minimum amount needed — mixing 65% of each original hex into black — which keeps the exact same hues and the same `to top` direction while making white text pass (7.41:1/6.24:1→ specifically 7.41:1 and 4.74:1). This is presented as a disclosed, minimal adjustment, not a different color choice.
+
+### Features Added
+- **Hero and Recognition Wall gradients updated** to the new, contrast-corrected version of the specified blue-to-cyan gradient (kept unified across both, as established in the prior phase).
+- **Leaderboard rank badges enlarged and given more visual weight** (1.5rem → 2rem, plus a subtle white ring and drop shadow) — adapting the circular numbered-badge style from the provided references to this app's existing strip-row layout.
+- **Each leaderboard strip now carries a colored left-border accent** matching its rank tier (gold/silver/bronze for ranks 1–3) — directly adapting the "colored ring + colored accent bar" pattern from the references, applied to a horizontal strip rather than the references' card shape.
+- **Pending Tasks now collapses behind a single toggle** ("View pending tasks" / "Hide pending tasks") instead of always showing every item's row. Collapsed by default: a compact one-line summary ("N tasks need your attention") is what's visible until the teacher chooses to expand — matching the same expand/collapse idiom `LeaderboardList.js`'s "Show all" already established, not a new interaction pattern.
+
+### Files Modified
+- `src/css/styles.css` — Hero/Recognition Wall gradient values updated; `.rank-badge` enlarged with ring/shadow; new `.editorial-list__row--rank-{1,2,3}`/`.leaderboard-list__row--rank-{1,2,3}` left-border rules; `.task-detail-container`/`.task-summary-line`/`.task-detail-toggle` added for the new collapse behavior.
+- `src/js/ui/components/WeeklySnapshotWidget.js`, `LeaderboardList.js` — each row's className now includes a rank-tier modifier for ranks 1–3.
+- `src/js/ui/components/PendingTasksWidget.js` — restructured to build a compact summary line + toggle button, with the existing group headings and checklist rows moved into a container that starts collapsed and toggles via a plain DOM class swap (no new module-level state needed — the existing resolved-item tracking is untouched and stays outside the collapsible area, so the success/collapse animation from Phase 5 still fires and is always visible regardless of expand state).
+
+### Breaking Changes
+None. Pending Task click-through, the resolution animation, and every other existing behavior are unchanged — only visible-by-default vs. visible-after-expand changed for the detail rows.
+
+### Regression Verification
+Computed-style checks confirmed: both gradient stops render the corrected (darkened) colors with white text; rank badges render at the new 32px size; rank-1 rows show the correct gold left-border; the Pending Tasks detail container starts with `display: none` and correctly toggles to `display: block` with the button label updating on click. A full regression pass — including clicking a Pending Task link *after* expanding, to confirm the click-through still works from inside the newly-collapsible container — confirmed zero errors across Settings, Notebook Register, Class Mode, and the Recognition Screen.
+
+### Architectural Decisions Made During Implementation
+- **The exact specified gradient was preserved as closely as possible** — darkening was calculated as the minimum needed for both stops to individually clear 4.5:1, not rounded to a "nice" percentage or substituted with different colors. This keeps faith with an explicit, specific instruction while still meeting the project's non-negotiable contrast bar.
+- **The Pending Tasks collapse needed no new state-tracking mechanism** — a plain CSS class toggle on a DOM node already built each render is sufficient, since the toggle only needs to affect the current render's own DOM, not persist across the widget's periodic re-renders (which already reset to a fresh, collapsed state each time — a reasonable default, since a re-render typically follows navigating back to the Dashboard).
+
+### Future TODOs
+- Consider whether the Pending Tasks toggle's collapsed/expanded state should persist across re-renders (e.g. if a teacher expands it, then a live classroom update from another teacher triggers a re-render) — currently resets to collapsed each time, which is a reasonable but not exhaustively considered default.
+- (Carried over, unchanged): Recognition-specific accent color question; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## App-Wide Gradient Rollout — Every Header, Every Primary Button
+
+**Context:** with the Hero's brighter gradient + text-shadow treatment approved (via a shared preview), direction to apply it consistently across every button and every page's header, not just the Dashboard.
+
+### Scope, mapped before touching anything
+Grepped for every header class actually in use, rather than assuming `.tracker-header` covered everything: found it shared across six views (Activities, Notebook Register/Timeline/Tracker, Recognition Screen, Class Mode), but Settings and Student Profile each maintain their *own* separate header classes (`.settings-header`, `.profile-header`). All three needed the same treatment individually — confirmed by testing each one directly rather than assuming the shared-class fix covered them.
+
+### Features Added
+- **`.tracker-header`** (shared across 6 views) — gradient background, white title/subtitle text with the shadow, white Back-button text.
+- **`.settings-header`** and **`.profile-header`** — same gradient/white-text treatment applied individually, since these are separate classes.
+- **`.btn--primary`** — every Primary button app-wide now uses the same gradient (previously a solid deep-blue fill), with the same white text + shadow.
+- **The Dashboard's own header deliberately excluded** from the blanket `.tracker-header` rule: it already has its own colorful moment nested inside (`.classroom-hero`), and giving the *outer* header a second, competing gradient would mean the Start Class Mode / Continue Working cards floating on top of it instead of a plain surface. Handled via a higher-specificity override (`.classroom-header`) that resets back to plain white — confirmed via computed style that the Dashboard's outer header stayed `background-image: none` while every other page's header correctly picked up the gradient.
+
+### Files Modified
+- `src/css/styles.css` — `.tracker-header`, `.settings-header`, `.profile-header` (backgrounds + their title/subtitle text); `.classroom-header` (explicit reset); `.tracker-header .btn--text` / `.settings-header .btn--text` / `.profile-header .btn--text` (white text, extended to cover all three header types); `.btn--primary` (gradient fill).
+
+### Breaking Changes
+None. Every route, click-through, and interaction is unchanged — this phase is a color/background rollout across existing surfaces, not a structural change.
+
+### Regression Verification
+Computed-style checks confirmed the gradient and white text render correctly on: Settings (all three tabs used), Notebook Tracker/Register/Timeline, Student Profile (reached via Class Mode's "Open Full Profile," not a plain student tap — the tap-to-award interaction is a separate, correctly-unrelated action), and the Recognition Screen. A full regression pass exercised real navigation across every one of these — Settings tab switching, notebook marking, Class Mode scoring, Student Profile back-navigation (confirmed it correctly returns to the Dashboard, an existing Phase 2 behavior, not something this phase changed), and Recognition Screen period switching — zero errors throughout.
+
+### Architectural Decisions Made During Implementation
+- **The scope was mapped with a grep before any CSS was written** — assuming "one shared header class" would have missed two of the three actual header implementations in this codebase (Settings, Student Profile each roll their own). This is the same discipline as every prior phase's "check the real file before editing" practice, just applied to architecture-mapping instead of a single file's content.
+- **The Dashboard's header was deliberately treated as an exception, not an oversight** — its already-existing nested Hero box is the more considered design (a colorful moment surrounded by calm white cards), and applying the blanket rule there too would have undone that structure rather than extended it.
+
+### Future TODOs
+- (Carried over, unchanged): Pending Tasks collapse-state persistence; Recognition-specific accent color question; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Flat Color Everywhere, Class Mode Catch-Up, Recognition Avatar Fixes
+
+**Context:** direct feedback against four fresh screenshots — a preference for a flat solid color over the gradient ("more appealing in student context... use this instead of the gradient everywhere"), a still-inconsistent Weekly Snapshot KPI color, Recognition's avatars all being one uniform blue with a real contrast problem on the Team Champion icon specifically, and — the biggest gap — Class Mode (the screen teachers and students actually look at most) never having received any of this initiative's treatment at all: no gradient/flat color, still-poor-contrast action buttons, and no star icons on scores.
+
+### Replacing the gradient with a flat color, everywhere
+Found and replaced all 6 gradient declarations (Hero, Recognition Wall, and all four separate header classes — `.tracker-header`, `.settings-header`, `.profile-header`, plus `.btn--primary`) with a single flat color, `#1565c0` — verified at 5.75:1 with white text, a clear, unambiguous pass rather than the gradient's compromise. Also redefined `--color-primary-deep` (used by the KPI card and Recognition's avatar) to this same flat value, so every "solid blue surface" in the app is now the *same* blue — resolving the Weekly Snapshot inconsistency by unifying the color, not by adding a gradient there.
+
+### Class Mode — the real gap, addressed directly
+This screen had never been touched in this whole initiative, despite being one of the most-used in the app:
+- **Team card headers**: solid cyan + dark `--color-on-brand` text → the unified flat blue + white text (a per-group custom color, set via Settings, correctly still takes precedence where a teacher has assigned one — confirmed this pre-existing customization feature via its inline-style implementation before touching anything, and left it alone).
+- **Header action buttons** (Undo, Reset Session, Settings, Learning Activities, Notebook Tracker): previously styled for a white background (cyan-on-white Ghost, red-on-white Danger) — on the new blue header, Ghost's cyan-on-blue pairing had genuinely poor contrast (similar hues). Both now use white-based styling; Danger keeps a distinct, darkened solid red fill (verified 5.57:1) so a destructive action still reads as visually different from Ghost, not just another same-toned button.
+- **Star icons added** to both the team's total score and each student row's score (`"0"` → `"0 ⭐"`), matching the star-icon pattern the leaderboards already established.
+
+### Recognition avatars
+- **Colorful cycling for co-winners** — the first winner keeps deep blue, a second/third co-winner cycle through darkened gold/pink (matching Groups' huddle-avatar pattern), so avatars carry some visual personality instead of one uniform color for every student.
+- **Team Champion's icon contrast fixed** — the 👥 emoji has its own baked-in glyph colors that CSS `color` cannot override; a solid dark-blue fill behind it was fighting those colors rather than complementing them. Given a light background instead, which lets the emoji's natural tones read clearly — and doubles as a visual cue that this specific avatar represents a team, not a student.
+
+### A deliberate scope boundary, disclosed rather than silently taken
+Tying Recognition's avatar colors to each student's *actual* Learning Bucket (green/yellow/red, an existing per-student classification) was considered, since it was suggested as an option ("may be buckets even"). It would require adding bucket data to the Progress Engine's winner objects — a data-shape change to a system that has been deliberately kept read-only and narrowly-scoped throughout this project. Implemented the lower-risk cycling-palette version instead (matching the existing Groups pattern) and flagged the bucket-tied version as a real, larger follow-up rather than taking on that change unannounced.
+
+### Files Modified
+- `src/css/styles.css` — 6 gradient declarations replaced with flat color; `--color-primary-deep` redefined; button hover recalculated from the new base; `.team-card__header`, ghost/danger button-in-header overrides, `.recognition-card__avatar` cycling + team-specific variant all added/updated.
+- `src/js/ui/components/TeamCard.js`, `ClassModeStudentRow.js` — star icon added to score text.
+- `src/js/ui/components/RecognitionCard.js` — team avatars now get a distinct CSS class (`recognition-card__avatar--team`) instead of sharing the student avatar's class.
+
+### Breaking Changes
+None. Every navigation path and interaction (tap-to-award, swipe-to-deduct, long-press, Undo, Reset Session) is unchanged — this phase only touched color, contrast, and score-display text.
+
+### Regression Verification
+Computed-style checks confirmed: every header/button renders the exact flat blue and correct text colors; the team card's per-group custom-color override still works where set; both new star icons render correctly; Recognition's first avatar is deep blue while the team avatar correctly switches to a light background. A full regression pass — Settings, Notebook Register, Class Mode (tap-to-award, Undo, Back), and the Recognition Screen — confirmed zero errors.
+
+### Architectural Decisions Made During Implementation
+- **The per-group custom color feature was identified and deliberately preserved**, not overridden, by reading `TeamCard.js`'s actual implementation before touching its CSS — an inline style already lets a teacher's chosen group color take precedence over the default, and the new flat-blue CSS rule only ever applies as that default's fallback.
+- **Bucket-tied Recognition avatars were explicitly scoped out** rather than quietly attempted or quietly ignored — the option was named, the reason (Progress Engine data-shape risk) was named, and a lower-risk alternative was implemented in its place.
+
+### Future TODOs
+- Wire Recognition avatars to each winner's actual Learning Bucket color, if wanted — requires extending the Progress Engine's winner data shape (`getRecognitionWinners`/`getLeaderboard`) to include bucket info, a larger, separate change from anything done this phase.
+- (Carried over, unchanged): Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.

@@ -46,7 +46,7 @@ export function createClassModeStudentRow(student, { onTap, onSwipeLeft, onLongP
 
   const score = document.createElement('span');
   score.className = 'student-row__points';
-  score.textContent = String(student.score);
+  score.textContent = `${student.score} \u2b50`;
 
   surface.append(name, score);
 

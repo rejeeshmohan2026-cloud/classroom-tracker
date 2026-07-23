@@ -26,7 +26,7 @@ export function createContinueWorkingWidgetElement({ entries, onOpenNotebook }) 
   widget.appendChild(heading);
 
   if (entries.length === 0) {
-    widget.appendChild(createEmptyStateElement({ message: 'No recently opened notebooks.' }));
+    widget.appendChild(createEmptyStateElement({ message: 'Notebooks you open will show up here.' }));
     return widget;
   }
 

@@ -16,6 +16,19 @@
 
 const COLLAPSED_COUNT = 3;
 
+/** Same reliable, CSS-based rank badge as WeeklySnapshotWidget.js — see that file's doc comment for why emoji medals were replaced (a real cross-platform rendering gap, not just a style preference). */
+function createRankIndicator(rank) {
+  if (rank > 3) {
+    const text = document.createElement('span');
+    text.textContent = `#${rank}`;
+    return text;
+  }
+  const badge = document.createElement('span');
+  badge.className = `rank-badge rank-badge--${rank}`;
+  badge.textContent = String(rank);
+  return badge;
+}
+
 export function createLeaderboardListElement({ entries, formatValue }) {
   const wrapper = document.createElement('div');
   wrapper.className = 'leaderboard-list';
@@ -40,11 +53,11 @@ export function createLeaderboardListElement({ entries, formatValue }) {
 
     visibleEntries.forEach((entry) => {
       const row = document.createElement('li');
-      row.className = 'leaderboard-list__row';
+      row.className = `leaderboard-list__row${entry.rank <= 3 ? ` leaderboard-list__row--rank-${entry.rank}` : ''}`;
 
       const rank = document.createElement('span');
       rank.className = 'leaderboard-list__rank';
-      rank.textContent = `#${entry.rank}`;
+      rank.appendChild(createRankIndicator(entry.rank));
 
       const name = document.createElement('span');
       name.className = 'leaderboard-list__name';
