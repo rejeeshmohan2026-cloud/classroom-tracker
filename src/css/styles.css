@@ -3777,3 +3777,56 @@ button.wizard-checklist__row:hover {
   background-color: var(--color-warning);
   flex-shrink: 0;
 }
+
+/* "Who's learning today?" student picker */
+.student-picker {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  gap: 1.25rem;
+}
+.student-picker__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  text-align: center;
+  margin: 0;
+}
+.student-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+.student-picker__card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.student-picker__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: var(--font-weight-black);
+  flex-shrink: 0;
+}
+.student-picker__name {
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-bold);
+}

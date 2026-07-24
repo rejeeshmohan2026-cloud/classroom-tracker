@@ -27,8 +27,9 @@ import * as router from './ui/router.js';
 import { renderWelcomeView } from './ui/views/WelcomeView.js';
 import { renderLandingView } from './ui/views/LandingView.js';
 import { renderStudentPortalShell } from './ui/student-portal/StudentPortalShell.js';
-import { renderStudentJoinCodeView } from './ui/student-portal/views/StudentJoinCodeView.js';
-import * as studentSessionService from './services/studentSessionService.js';
+import { renderStudentOnboardingFlow } from './ui/student-portal/onboarding/StudentOnboardingFlow.js';
+import { renderStudentPickerView } from './ui/student-portal/onboarding/StudentPickerView.js';
+import * as studentIdentityService from './services/studentIdentityService.js';
 import { renderStudentHomeView } from './ui/student-portal/views/StudentHomeView.js';
 import { renderStudentAchievementsView } from './ui/student-portal/views/StudentAchievementsView.js';
 import { renderStudentTeamView } from './ui/student-portal/views/StudentTeamView.js';
@@ -184,6 +185,36 @@ function renderLoadingScreen(container) {
   container.appendChild(wrapper);
 }
 
+function renderStudentPortalMain(route) {
+  renderStudentPortalShell(appContainer, {
+    activeSection: route.section,
+    onNavigateSection: (section) => router.navigate(`/student/${section}`),
+    onBackToLanding: () => router.navigate('/'),
+    renderSectionContent: (content) => {
+      if (route.section === 'achievements') {
+        renderStudentAchievementsView(content);
+      } else if (route.section === 'team') {
+        renderStudentTeamView(content);
+      } else if (route.section === 'learn') {
+        renderStudentLearnView(content);
+      } else if (route.section === 'profile') {
+        renderStudentPortalProfileView(content, {
+          onSwitchStudent: async () => {
+            const linked = await studentIdentityService.listLinkedStudents();
+            if (linked.length < 2) return; // nothing to switch to
+            renderStudentPickerView(content, {
+              students: linked,
+              onSelected: () => renderRoute(router.getCurrentRoute()),
+            });
+          },
+        });
+      } else {
+        renderStudentHomeView(content);
+      }
+    },
+  });
+}
+
 function renderRoute(route) {
   // Bloom Labs platform-level routes — deliberately checked before the
   // auth gate below. Neither of these is part of Classroom Tracker's
@@ -202,35 +233,11 @@ function renderRoute(route) {
   if (route.name === 'studentPortal') {
     userBarContainer.innerHTML = '';
 
-    if (!studentSessionService.getJoinedCode()) {
-      renderStudentJoinCodeView(appContainer, {
-        onJoined: () => renderRoute(route),
-      });
-      return;
-    }
+    const invitationToken = route.query?.token || null;
 
-    renderStudentPortalShell(appContainer, {
-      activeSection: route.section,
-      onNavigateSection: (section) => router.navigate(`/student/${section}`),
-      onBackToLanding: () => router.navigate('/'),
-      renderSectionContent: (content) => {
-        if (route.section === 'achievements') {
-          renderStudentAchievementsView(content);
-        } else if (route.section === 'team') {
-          renderStudentTeamView(content);
-        } else if (route.section === 'learn') {
-          renderStudentLearnView(content);
-        } else if (route.section === 'profile') {
-          renderStudentPortalProfileView(content, {
-            onJoinAnotherClassroom: () => {
-              studentSessionService.clearJoinedCode();
-              renderRoute(route);
-            },
-          });
-        } else {
-          renderStudentHomeView(content);
-        }
-      },
+    renderStudentOnboardingFlow(appContainer, {
+      invitationToken,
+      onResolved: () => renderStudentPortalMain(route),
     });
     return;
   }

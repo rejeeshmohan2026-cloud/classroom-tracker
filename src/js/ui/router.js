@@ -33,9 +33,24 @@
  */
 
 function parseHash() {
-  const hash = window.location.hash.replace(/^#\/?/, '');
-  const parts = hash.split('/').filter(Boolean);
+  const rawHash = window.location.hash.replace(/^#\/?/, '');
+  // A hash-based router's own "query string" lives inside the
+  // fragment (e.g. #/student?token=xxx), not in the page's real
+  // window.location.search — that's a separate, unrelated thing that
+  // lives before the #. Split it off before parsing path segments, or
+  // e.g. "student?token=xxx" would be read as one broken path segment
+  // instead of the path "student" plus a token param.
+  const [pathPart, queryPart] = rawHash.split('?');
+  const query = Object.fromEntries(new URLSearchParams(queryPart || ''));
+  const parts = pathPart.split('/').filter(Boolean);
+  // Attached to every route this resolves to (see resolvePathParts()
+  // below) — most routes ignore it, but any route can read
+  // route.query for its own hash-embedded params, the same way
+  // #/student?token=xxx does today.
+  return { ...resolvePathParts(parts), query };
+}
 
+function resolvePathParts(parts) {
   if (parts[0] === 'classroom' && parts[1]) {
     if (parts[2] === 'class-mode') {
       return { name: 'tracker', classroomId: parts[1] };

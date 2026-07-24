@@ -1381,3 +1381,59 @@ An early test run failed with a null bounding-box error when tapping a second an
 ### Future TODOs
 - **Session Lock (10-minute reopen window)** and **Session History (a permanent Session record students' history entries reference)** — items 6 and 7 from this request — not built this phase. Both need a genuinely new data model (a permanent session record, timestamp-based lock logic that survives a refresh) rather than the UI-layer changes covered here, and deserve their own focused pass rather than being fit into whatever budget remained in this one.
 - (Carried over, unchanged): note-undo gap in `classModeService`; Student Portal real-data wiring pending AI Working Committee review; consolidate avatar implementations; `firestore.rules` review; Learning Hub; role-based routing; all previously-listed items.
+
+---
+
+## Student Identity Architecture — StudentIdentityService, Provider/Consent Interfaces, Demo Implementations
+
+**Context:** the finalized Bloom Labs authentication direction — Google Sign-In for parents, separated from student identity via a linking step (PIN or invitation link). Built in full on fixture data (`DemoIdentityProvider`, `DemoConsentProvider`, `DemoStudentLinkRepository`) per explicit agreement: production identity and real consent capture stay behind interfaces, unimplemented, so this is safe to build now without touching the still-open compliance question described in the Student Portal entries above.
+
+### Architecture
+- **`IdentityProvider`** (interface) — "who is this authenticated user," nothing more. `DemoIdentityProvider` simulates a parent's Google sign-in with a fixed demo identity. A production `GoogleIdentityProvider` (wrapping Firebase Auth, the same pattern `authService.js` already uses for teachers) is not part of this phase.
+- **`ConsentProvider`** (interface, placeholder only, per explicit instruction) — `DemoConsentProvider` always answers "granted," instantly. Every linking call in `studentIdentityService.js` already checks through this interface — the check exists, it is just not load-bearing yet. Documented plainly, more than once, so `DemoConsentProvider`'s automatic approval is never mistaken for real consent capture.
+- **`StudentLinkRepository`** (interface) — the persistence contract, documented against a real proposed Firestore model even though `DemoStudentLinkRepository` never touches Firestore:
+  - `identityLinks/{providerUserId}` — the account-to-student mapping, keyed by provider user id (not classroom/student) so a sign-in resolves in one document read; `provider` stored per-link so Microsoft/SSO/OTP can write into the same collection later without a schema change.
+  - A student's PIN lives on the *existing* student object inside its classroom document, not a parallel top-level `students` collection — reusing the current nested model, per Bloom Labs' stated data-reuse philosophy.
+  - `invitationTokens/{token}` — its own small collection, same reasoning as the co-teacher join-code collection from an earlier phase: a token needs to be resolvable by someone not yet linked to anything, which a full classroom document can't safely allow.
+- **`studentIdentityService.js`** — the only thing any Student Portal screen imports. Composes the three interfaces; swapping to production is changing three instantiations in this one file, nothing downstream.
+
+### Two real bugs found through testing, not assumed correct
+1. **Invitation links never actually worked as designed.** `main.js` read the token from `window.location.search` — the page's real, pre-`#` query string — but the invitation URL puts the token *inside* the hash fragment (`#/student?token=...`), which is a completely different, unrelated string in a hash-based router. Separately, `router.js`'s own path-splitting had no handling for a `?query` suffix at all, so `#/student?token=xxx` parsed as one broken path segment (`student?token=xxx`) instead of the path `student` plus a token param — meaning the route wasn't even recognized as the Student Portal, let alone carrying the token correctly. Both fixed together: `router.js` now splits off and parses a hash-embedded query string into `route.query` for every route (not just this one), and `main.js` reads `route.query.token` instead of the unrelated real query string.
+2. **A parent clicking a second child's invitation link while already linked to a first child was silently ignored.** The onboarding flow checked "is a student already resolved" before checking "is there an invitation token to process," so an already-linked parent visiting a *new* invitation link just saw their existing child's Home screen, with the token never touched at all — exactly backwards for the multi-student requirement this whole feature is partly about. Fixed by processing a present invitation token first, always, before falling back to the already-resolved fast path.
+
+Both were caught by testing the actual flow with a real Playwright browser, not by re-reading the code — the first surfaced as the invitation link routing to Classroom Tracker's own login screen instead of the Student Portal at all; the second surfaced as the "Who's learning today?" picker never appearing after a real navigation to a token URL, even though the exact same token/redemption logic worked correctly when exercised directly.
+
+### Features Added
+- **Onboarding flow** (`StudentOnboardingFlow.js`) — sign in → invitation token (if present) or PIN → multi-student picker (only if more than one student is linked) → done. Supersedes and replaces the earlier classroom-code + `localStorage` placeholder flow entirely (`StudentJoinCodeView.js`, `studentSessionService.js` — both removed, confirmed via grep that nothing else referenced them first).
+- **"Who's learning today?" picker** and **Profile's "Switch Student"** — reuses the shared avatar generator, so a sibling's picker entry matches their own Profile avatar rather than a generic placeholder.
+- **Teacher-side "Portal Access" section** (Student Profile, Overview tab) — Generate/Reset/Copy/Share for the Student PIN. Share builds a single-use, 7-day invitation link and uses the native share sheet (`navigator.share`) when available, falling back to clipboard copy.
+
+### Files Created
+- `src/js/services/identity/IdentityProvider.js`, `DemoIdentityProvider.js`, `ConsentProvider.js`, `DemoConsentProvider.js`
+- `src/js/repositories/identity/StudentLinkRepository.js`, `DemoStudentLinkRepository.js`
+- `src/js/services/studentIdentityService.js`
+- `src/js/ui/student-portal/onboarding/StudentSignInView.js`, `StudentLinkView.js`, `StudentPickerView.js`, `StudentOnboardingFlow.js`
+
+### Files Modified
+- `src/js/ui/router.js` — hash-embedded query string parsing (`route.query`), needed correctly for any future route, not just this one.
+- `src/js/main.js` — `studentPortal` route rewired to the new onboarding flow; token read from `route.query`.
+- `src/js/ui/views/StudentProfileView.js` (teacher-side) — Portal Access / PIN management section added.
+- `src/js/ui/student-portal/views/StudentProfileView.js` (Portal-side) — `onJoinAnotherClassroom` renamed to `onSwitchStudent`, button text updated.
+
+### Files Removed
+- `src/js/ui/student-portal/views/StudentJoinCodeView.js`, `src/js/services/studentSessionService.js` — superseded by the finalized Google + PIN/invitation-link direction.
+
+### Breaking Changes
+None to Classroom Tracker. The `router.js` change is additive (a new `query` field on every route object) and was specifically regression-tested against routes with multiple path parameters (Notebook Register's subject/type/date, Notebook Timeline's subject/type/yearMonth, Recognition Screen's period/category) to confirm the refactor didn't disturb existing multi-segment parsing.
+
+### Regression Verification
+Confirmed end-to-end with real browser navigation (not just service-level calls): sign-in, wrong-PIN rejection, correct-PIN linking, and — via a genuine full page reload — that linking is remembered. Confirmed invitation token generation, redemption, and that a second redemption attempt on the same token correctly fails (single-use). Confirmed the multi-student picker actually renders after a real navigation to an invitation link while already linked to a first student, that selecting a second student updates "last selected" correctly across another real reload, and that Profile's "Switch Student" reopens the picker. Confirmed the teacher-side Portal Access section renders without error with the correct PIN. A full Classroom Tracker regression (Settings, Teachers tab, notebook marking across multi-segment routes, Class Mode, Session Review, Recognition Screen with re-navigation across different params) confirmed zero impact elsewhere.
+
+### Architectural Decisions Made During Implementation
+- **The PIN is designed to live on the existing student object, not a new collection** — directly reusing Bloom Labs' stated data philosophy, and avoiding a parallel source of truth for "which students exist" that could drift from the classroom document Classroom Tracker already treats as authoritative.
+- **`ConsentProvider` was still built as a real interface with real call sites, not a stub nobody calls** — every linking path in `studentIdentityService.js` already checks consent, so that a production `ConsentProvider` genuinely gates linking the moment it's implemented, rather than requiring new call sites to be added retroactively throughout the linking logic.
+- **The invitation-token bug was fixed at the router level, not with a one-off parameter read in `main.js`** — a hash-based router needs to support query-like params in its fragment generally, not just for this one feature; fixing it once, generically, means the next feature that needs a URL parameter doesn't hit the same bug.
+
+### Future TODOs
+- Production `GoogleIdentityProvider` and a real `ConsentProvider` (disclosure + affirmative parent/guardian confirmation + stored consent record) — both remain gated behind the same compliance review described in the Student Portal Foundation entry above.
+- (Carried over, unchanged): note-undo gap in `classModeService`; Session Lock and Session History from the Class Mode UX phase; consolidate avatar implementations; `firestore.rules` review; Learning Hub; role-based routing; all previously-listed items.

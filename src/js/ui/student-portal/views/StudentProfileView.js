@@ -3,8 +3,8 @@
  *
  * Shows the generated avatar (initials + deterministic color — see
  * utils/avatarGenerator.js), name, classroom, group, and role, plus a
- * "Join Another Classroom" action reusing the same first-visit code
- * entry screen (see StudentJoinCodeView.js). No photo upload anywhere:
+ * "Switch Student" action, for a parent linked to more than one child
+ * entry screen. No photo upload anywhere:
  * not a missing feature, a deliberate decision (see this project's
  * CHANGELOG). getAvatarForPerson() already branches on a `type` field
  * specifically so that adding real photo support later is a change to
@@ -14,7 +14,7 @@
 import { getCurrentStudentProfile } from '../../../services/studentPortalDataService.js';
 import { getAvatarForPerson } from '../../../utils/avatarGenerator.js';
 
-export function renderStudentProfileView(container, { onJoinAnotherClassroom }) {
+export function renderStudentProfileView(container, { onSwitchStudent }) {
   container.innerHTML = '';
 
   const profile = getCurrentStudentProfile();
@@ -48,12 +48,12 @@ export function renderStudentProfileView(container, { onJoinAnotherClassroom }) 
   );
   wrapper.appendChild(details);
 
-  if (onJoinAnotherClassroom) {
+  if (onSwitchStudent) {
     const joinAnotherButton = document.createElement('button');
     joinAnotherButton.type = 'button';
     joinAnotherButton.className = 'btn btn--ghost student-profile__join-another';
-    joinAnotherButton.textContent = 'Join Another Classroom';
-    joinAnotherButton.addEventListener('click', onJoinAnotherClassroom);
+    joinAnotherButton.textContent = 'Switch Student';
+    joinAnotherButton.addEventListener('click', onSwitchStudent);
     wrapper.appendChild(joinAnotherButton);
   }
 

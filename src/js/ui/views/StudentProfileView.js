@@ -17,6 +17,8 @@
  */
 
 import * as workspaceService from '../../services/workspaceService.js';
+import * as studentIdentityService from '../../services/studentIdentityService.js';
+import { showToast } from '../components/Toast.js';
 import * as studentService from '../../services/studentService.js';
 import * as bucketService from '../../services/bucketService.js';
 import * as badgeService from '../../services/badgeService.js';
@@ -240,6 +242,107 @@ function renderOverviewTab(content, classroom, student, team, rerender) {
   }
   groupSection.appendChild(groupCard);
   content.appendChild(groupSection);
+
+  content.appendChild(createPortalAccessSection(classroom, student, rerender));
+}
+
+/**
+ * "Portal Access" — Generate/Reset/Copy/Share the Student PIN used to
+ * link this student to a parent's Google account in the Student
+ * Portal (see services/studentIdentityService.js). Teachers never
+ * choose or type a PIN themselves — only Generate/Reset exist. Share
+ * builds a one-time invitation link (see
+ * generateInvitationTokenForStudent()) and uses the device's native
+ * share sheet when available, falling back to copying the link.
+ *
+ * Uses studentIdentityService.listDemoRoster() to find this student's
+ * current PIN — a demo-only lookup, since the fixture repository
+ * doesn't index PINs by this app's real classroom/student ids. A
+ * production repository would read the PIN directly off the student
+ * object instead (see repositories/identity/StudentLinkRepository.js's
+ * own doc comment on where a PIN actually lives in that model).
+ */
+function createPortalAccessSection(classroom, student, rerender) {
+  const section = document.createElement('div');
+  section.className = 'profile-section';
+
+  const heading = document.createElement('h2');
+  heading.className = 'profile-section__heading';
+  heading.textContent = 'Portal Access';
+  section.appendChild(heading);
+
+  const note = document.createElement('p');
+  note.className = 'profile-section__meta';
+  note.textContent = 'Share this PIN (or an invitation link) so a parent can link their Google account to this student in the Student Portal.';
+  section.appendChild(note);
+
+  const demoEntry = studentIdentityService.listDemoRoster().find((entry) => entry.studentName === student.name);
+  const pinRow = document.createElement('div');
+  pinRow.className = 'join-code-display';
+
+  const pinValue = document.createElement('span');
+  pinValue.className = 'join-code-display__value';
+  pinValue.textContent = demoEntry ? demoEntry.pin : 'Not available in this demo roster';
+  pinRow.appendChild(pinValue);
+
+  const generateButton = document.createElement('button');
+  generateButton.type = 'button';
+  generateButton.className = 'btn btn--ghost';
+  generateButton.textContent = demoEntry ? 'Reset' : 'Generate';
+  generateButton.disabled = !demoEntry;
+  generateButton.addEventListener('click', async () => {
+    await studentIdentityService.generatePinForStudent(classroom.id, demoEntry.studentId);
+    showToast('New PIN generated');
+    rerender();
+  });
+  pinRow.appendChild(generateButton);
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'btn btn--ghost';
+  copyButton.textContent = 'Copy';
+  copyButton.disabled = !demoEntry;
+  copyButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(demoEntry.pin);
+      copyButton.textContent = 'Copied!';
+      setTimeout(() => { copyButton.textContent = 'Copy'; }, 1500);
+    } catch (error) {
+      console.error('[StudentProfileView] Failed to copy PIN:', error);
+      window.alert(`Student PIN: ${demoEntry.pin}`);
+    }
+  });
+  pinRow.appendChild(copyButton);
+
+  const shareButton = document.createElement('button');
+  shareButton.type = 'button';
+  shareButton.className = 'btn btn--primary';
+  shareButton.textContent = 'Share';
+  shareButton.disabled = !demoEntry;
+  shareButton.addEventListener('click', async () => {
+    const token = await studentIdentityService.generateInvitationTokenForStudent(classroom.id, demoEntry.studentId, 7);
+    const link = `${window.location.origin}${window.location.pathname}#/student?token=${token}`;
+    const shareText = `Link your Google account to ${student.name} on Bloom Labs: ${link}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Bloom Labs Student Portal', text: shareText, url: link });
+        return;
+      } catch (error) {
+        // User cancelled the native share sheet, or it's unavailable — fall through to copy.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast('Invitation link copied \u2014 expires in 7 days, single use');
+    } catch (error) {
+      console.error('[StudentProfileView] Failed to copy invitation link:', error);
+      window.alert(shareText);
+    }
+  });
+  pinRow.appendChild(shareButton);
+
+  section.appendChild(pinRow);
+  return section;
 }
 
 function createStatCard(label, value) {
