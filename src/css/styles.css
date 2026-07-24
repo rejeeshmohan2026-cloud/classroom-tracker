@@ -3357,3 +3357,300 @@ button.wizard-checklist__row:hover {
   padding-top: 0;
   padding-bottom: 0;
 }
+
+/*
+ * ---------------------------------------------------------------------
+ * Student Portal — deliberately its own visual register, not a themed
+ * copy of Classroom Tracker's admin-dashboard chrome. Per the stated
+ * product philosophy ("encouraging, personal, motivating... avoid
+ * admin dashboards and teacher terminology"), nothing below reuses
+ * .tracker-header, .dashboard-widget, or any of Classroom Tracker's
+ * palette tokens directly — nothing here should look like the same
+ * app wearing a different hat. Self-contained block; if this needs to
+ * change, Classroom Tracker's styling is unaffected, and vice versa.
+ * ---------------------------------------------------------------------
+ */
+
+.student-portal {
+  min-height: 100vh;
+  background-color: #fef9f3;
+}
+
+.student-portal__topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.5rem 0;
+}
+.student-portal__back-link {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+.student-portal__back-link:hover {
+  color: var(--color-primary);
+}
+
+.student-portal__nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.5rem 1rem;
+  flex-wrap: wrap;
+}
+.student-portal__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  color: var(--color-muted);
+  font-family: inherit;
+}
+.student-portal__tab-icon {
+  font-size: 1.3rem;
+}
+.student-portal__tab-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+}
+.student-portal__tab--active {
+  background-color: #fff0dc;
+  color: #b8631a;
+}
+
+.student-portal__content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 3rem;
+}
+
+.student-section__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1rem;
+}
+
+/* Home */
+.student-home__greeting {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1.25rem;
+  text-align: center;
+}
+.student-home__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.student-home__card {
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-home__card-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.student-home__card-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.student-home__card-value {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.2rem;
+  color: #b8631a;
+}
+.student-home__card-caption {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* Achievements */
+.student-achievements__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.student-achievements__item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-achievements__item-icon {
+  font-size: 1.75rem;
+}
+.student-achievements__item-label {
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+.student-achievements__item-meta {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0.15rem 0 0;
+}
+
+/* Team */
+.student-team__stars {
+  font-size: 1.1rem;
+  color: var(--color-muted);
+  margin: 0 0 1.25rem;
+}
+.student-team__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.student-team__row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 0.85rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-team__row-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: var(--font-weight-bold);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.student-team__row-name {
+  font-weight: var(--font-weight-medium);
+}
+
+/* Learn (placeholder) */
+.student-learn-placeholder {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.student-learn-placeholder__icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+.student-learn-placeholder__subtitle {
+  color: var(--color-muted);
+  font-size: 1.1rem;
+}
+
+/* Profile */
+.student-profile {
+  text-align: center;
+}
+.student-profile__avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 2.2rem;
+  font-weight: var(--font-weight-black);
+}
+.student-profile__name {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1.5rem;
+}
+.student-profile__details {
+  max-width: 320px;
+  margin: 0 auto;
+  text-align: left;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-profile__detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f3e8dc;
+}
+.student-profile__detail-row:last-child {
+  border-bottom: none;
+}
+.student-profile__detail-label {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.student-profile__detail-value {
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+/* First-visit Classroom ID entry screen */
+.student-join-code {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 0.85rem;
+}
+.student-join-code__icon {
+  font-size: 3rem;
+}
+.student-join-code__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+.student-join-code__subtitle {
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+}
+.student-join-code__input {
+  width: 100%;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.student-join-code__error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.student-profile__join-another {
+  margin-top: 1.5rem;
+}

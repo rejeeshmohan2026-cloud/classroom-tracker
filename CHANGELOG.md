@@ -1185,3 +1185,99 @@ The full join flow was tested with two genuinely distinct simulated teacher iden
 - Have the proposed `firestore.rules` changes reviewed and tested against a real Firestore project, then deployed.
 - Escalate the Student Portal's classroom-ID validation to the AI Working Committee, per this project's own data-handling rules, before building any part of it.
 - (Carried over, unchanged): Role-based routing; real Student Portal; Learning Hub; Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Student Portal Foundation (Placeholder Data — Real Student Data Still Not Wired)
+
+**Context:** Bloom Labs' architecture now names three products (Classroom Tracker, Student Portal, Learning Hub) with the Student Portal's implementation "approved," explicitly ruling out photo storage in favor of generated avatars. The foundation is built in full. Real student authentication and real Firestore reads tied to an identifiable student are not — see the dedicated section below for why that boundary still holds, and why this spec (thoughtful as it is about avoiding photos specifically) doesn't change the underlying reasoning.
+
+### Platform-level vs. product-level — decisions made explicit, as requested
+- **The avatar generator is platform-level** (`utils/avatarGenerator.js`), not nested under the Student Portal. Classroom Tracker already shows initials-in-a-circle in three different places (`RecognitionCard.js`, `TeamCard`'s huddle avatars, `UserBar`'s fallback) — each with its own slightly different initials/color logic. Rather than adding a fourth bespoke implementation for the Portal, this centralizes the pattern so all four call sites *could* eventually share one implementation (not done this phase, to keep the change small — see Future TODOs).
+- **The Student Portal's views and shell are product-level**, in their own `ui/student-portal/` directory — not mixed into `ui/views/` alongside Classroom Tracker's screens. The product philosophy is explicit that this isn't "a restricted view of Classroom Tracker," and the file layout now reflects that as directly as the UI does.
+- **The placeholder data service is product-level** (`services/studentPortalDataService.js`) but its *field shapes* deliberately mirror `models/Student.js`/`models/Classroom.js` rather than inventing a parallel structure — reflecting the stated data philosophy ("reuse existing Firestore data wherever possible") even though no real Firestore reads exist yet. When this does get wired to real data, it should be a thin read over the same classroom document Classroom Tracker already uses.
+
+### Features Added
+- **`utils/avatarGenerator.js`** — `getInitials()` and `getAvatarForPerson()`, the latter returning `{ type: 'generated', initials, color }` today. Every caller branches on `type` rather than assuming `initials`/`color` exist, specifically so a future `{ type: 'photo', url }` variant is a change to this one function, not to every screen showing an avatar — directly satisfying "design the avatar system so photo support could be added later without changing the rest of the architecture." Verified via direct execution that 9 sample names produce well-distributed initials and colors (not a degenerate hash always landing on the same value).
+- **`services/studentPortalDataService.js`** — the Portal's sole data source, returning explicitly-labeled placeholder data (a single named `PLACEHOLDER_STUDENT` constant, not scattered mock values).
+- **`ui/student-portal/StudentPortalShell.js`** — persistent navigation across the 5 required sections (Home/Achievements/Team/Learn/Profile), plus a small link back to the Bloom Labs landing page (the same real gap identified and fixed on the teacher side previously — it applies equally here).
+- **Five section views** — Home (the 5 specified cards: My Stars, My Team, Recognition Wall, My Journey, Continue Learning), Achievements, Team, Learn (an honest "coming soon," since Learning Hub doesn't exist), and Profile (generated avatar, name, classroom, group, role — no photo upload anywhere).
+- **A dedicated, self-contained CSS register** for the whole Portal — deliberately not reusing `.tracker-header`/`.dashboard-widget` or Classroom Tracker's color tokens, so nothing here looks like the same admin app wearing a different hat, matching "avoid admin dashboards and teacher terminology."
+- **Router extended** — `#/student/{section}` sub-routes replace the old flat placeholder route; `#/student` alone defaults to Home.
+
+### A real bug caught by testing, not by re-reading the code
+The very first end-to-end test run failed immediately: `Identifier 'renderStudentProfileView' has already been declared`. Investigating found a genuine naming collision — Classroom Tracker already has its own `StudentProfileView.js` (a teacher looking at one student's profile from inside a classroom), a completely different screen from the new Student Portal's "my own profile" view, which happened to export a function with the exact same name. Fixed by aliasing the new import (`renderStudentPortalProfileView`) rather than renaming the existing, working Classroom Tracker file — the old one was correct as it stood; the new one was the thing that needed to adapt. Caught by actually running the app, not by reasoning about the code in isolation.
+
+### The Student Portal's real data — still not wired, and why this spec doesn't change that
+This phase's spec is thoughtful about avoiding one specific risk (photo storage) but doesn't address the deeper one: real student authentication plus a persistent, trackable Firestore record for an identifiable minor is itself what triggers India's DPDP Act's children's-data provisions (Section 9, requiring verifiable parental consent), which is what this project's own organizational data-handling rules require escalating to the AI Working Committee before proceeding. Nothing in this phase's implementation touches real authentication or real student records — every field shown anywhere in the Portal comes from the placeholder service, confirmed directly: `getCurrentStudentProfile()`, `getHomeSummary()`, `getAchievements()`, and `getTeamSummary()` are the *only* functions any Portal view calls for data, and none of them touch Firestore.
+
+### Files Created
+- `src/js/utils/avatarGenerator.js`
+- `src/js/services/studentPortalDataService.js`
+- `src/js/ui/student-portal/StudentPortalShell.js`
+- `src/js/ui/student-portal/views/StudentHomeView.js`, `StudentAchievementsView.js`, `StudentTeamView.js`, `StudentLearnView.js`, `StudentProfileView.js`
+
+### Files Modified
+- `src/js/ui/router.js` — `#/student/{section}` sub-routing.
+- `src/js/main.js` — new imports (one aliased to resolve the naming collision above); `studentPortal` route handling replacing the old flat placeholder dispatch.
+- `src/js/ui/views/LandingView.js` — one stale comment reference updated.
+- `src/css/styles.css` — the full Student Portal CSS block appended.
+
+### Files Removed
+- `src/js/ui/views/StudentPlaceholderView.js` — fully superseded by the real shell; confirmed via grep that nothing else referenced it before deleting.
+
+### New Firestore Fields or Collections Introduced
+**None.** This phase introduces no new Firestore reads, writes, fields, or collections — every Portal screen renders from the in-memory placeholder service only. (For context: the *previous* phase's Classroom ID / co-teacher joining feature did introduce a new `joinCodes/{code}` collection and a narrowly-scoped classroom `allow update` rule addition, both still pending the user's own review against a real Firestore project — unrelated to this phase's work, and unaffected by it.)
+
+### Breaking Changes
+None. A full regression pass confirmed every piece of existing Classroom Tracker functionality — Settings (Groups/Students/Notebooks/Teachers/Danger Zone), the Classroom ID display, notebook marking and Timeline (default weekly mode), Class Mode (award + Undo, icon-only buttons), the Recognition Screen, the accent color picker, and the Bloom Labs link — all work exactly as before, unaffected by anything added this phase.
+
+### Regression Verification
+The full Student Portal was tested end-to-end: default landing on Home with exactly 5 cards matching the spec's exact titles; Achievements/Team/Learn/Profile all render their placeholder content correctly; the Profile view's generated avatar shows the correct initials and a color that matches the same deterministic hash verified directly against the utility function; a direct deep link to `#/student/team` renders correctly without going through Home first; the Bloom Labs back-link works. Separately, a full Classroom Tracker regression (Settings, Teachers tab, Danger Zone, notebook marking, Class Mode, Recognition Screen, accent colors, the Bloom Labs link) confirmed zero impact on existing functionality.
+
+### Architectural Decisions Made During Implementation
+- **The avatar generator was placed at the platform level even though only the Student Portal explicitly asked for it** — Classroom Tracker already had three different ad-hoc "initials in a circle" implementations scattered across its own components; introducing a fourth, bespoke one for the Portal would have been the wrong call given "prefer reusable services and shared models over product-specific implementations." Consolidating all four into one shared implementation was considered but not done this phase, to keep this change small and focused — flagged as a real follow-up, not silently done partway.
+- **The placeholder data service exists as a named, single-purpose file rather than inline mock values in each view** — specifically so there's exactly one place to change when real data wiring is eventually approved, rather than five views each needing their own update.
+- **The Student Portal was NOT given its own theme/accent-color picker**, unlike the teacher app — that feature is explicitly a per-teacher preference (see its own CHANGELOG entry), and nothing in this phase's spec asked for a student-facing equivalent; adding one would have been scope creep beyond what was requested.
+
+### Future TODOs
+- Consolidate Classroom Tracker's three existing ad-hoc initials-in-a-circle implementations (`RecognitionCard.js`, `TeamCard`'s huddle avatars, `UserBar`'s fallback) onto the new shared `avatarGenerator.js`, now that it exists — not done this phase to keep this change focused on the Student Portal itself.
+- Wire the Student Portal to real student data — blocked pending the AI Working Committee review described above; this is not a technical gap, it's a compliance gate.
+- Have the previous phase's proposed `firestore.rules` changes (join codes, co-teacher self-add) reviewed and tested against a real Firestore project.
+- (Carried over, unchanged): real Student Portal authentication; Learning Hub; role-based routing; Learning Bucket-tied Recognition avatars; Pending Tasks collapse-state persistence; downstream palette travel; Classroom Culture; Phase 7C polish; Phase 6B Workspace Personalization; theme-service file cleanup; all previously-listed items.
+
+---
+
+## Student Portal: First-Visit Classroom ID, Remembered Sessions, Join Another Classroom
+
+**Context:** direct feedback that clicking into the Student Portal with a fresh session just showed the placeholder shell, when it should ask for a Classroom ID on first visit, remember it afterward, and let Profile offer joining a different classroom.
+
+### What was built — the interaction pattern, on a client-only placeholder mechanism
+- **`services/studentSessionService.js`** (new) — remembers, per browser via `localStorage`, which code a visitor entered. A separate, small module rather than reusing `storage/localStorageAdapter.js`, whose own doc comment states "nothing new is ever written here" (it's a one-time migration adapter) — respecting that file's stated contract rather than quietly overloading it for a genuinely different, ongoing purpose.
+- **`ui/student-portal/views/StudentJoinCodeView.js`** (new) — the first-visit screen. Accepts any plausible, non-empty code (checked only for length, not looked up against real data) and stores it.
+- **`main.js`** now gates the whole Student Portal on `studentSessionService.getJoinedCode()`: no stored code → the join screen; a stored code → the shell, exactly as before.
+- **Profile's new "Join Another Classroom" button** clears the stored code and re-renders the current route, which naturally falls back to the join screen — then, after entering a new code, returns to wherever the visitor was (confirmed via testing: joining again from Profile lands back on Profile, not Home).
+
+### The same boundary as before, applied to this specific mechanism
+This does not look up the entered code against any real classroom. Whatever is typed is accepted, and the same placeholder dashboard renders regardless — a real teacher's actual Classroom ID would not "work" here any differently from a made-up one, because no real lookup exists. That's deliberate, not an oversight: building a genuine lookup against real classroom/student data is the same piece this project has held behind the AI Working Committee review throughout (see the Student Portal Foundation entry above for the full reasoning) — the DPDP trigger is real student authentication and a persistent, trackable identity, not the specific UI pattern of asking for a code. This phase builds and lets the *interaction pattern* be reviewed now, entirely separately from that still-pending decision.
+
+### Files Created
+- `src/js/services/studentSessionService.js`
+- `src/js/ui/student-portal/views/StudentJoinCodeView.js`
+
+### Files Modified
+- `src/js/main.js` — first-visit gate added to the `studentPortal` route; Profile's join-another wiring.
+- `src/js/ui/student-portal/views/StudentProfileView.js` — `onJoinAnotherClassroom` prop and button added.
+- `src/css/styles.css` — join-code screen and profile button styling.
+
+### New Firestore Fields or Collections Introduced
+**None.** The remembered code lives only in this browser's `localStorage`, not Firestore — consistent with this being a client-side interaction pattern, not real classroom membership.
+
+### Breaking Changes
+None. Every existing Student Portal section and all of Classroom Tracker were re-verified working exactly as before.
+
+### Regression Verification
+Confirmed via a real, full page reload (not just in-app navigation) that a joined code persists correctly and skips straight to the shell on a fresh page load — the important test here, since an in-memory-only check wouldn't have proven the "remembered across visits" behavior actually works. Confirmed a too-short code shows an error and does not proceed; confirmed "Join Another Classroom" correctly returns to the join screen and, after entering a new code, lands back on the exact section the visitor was on (Profile), not a hardcoded default. All 5 Student Portal sections and a full separate Classroom Tracker pass (Settings, Class Mode) both confirmed unaffected.
+
+### Future TODOs
+- (Carried over, unchanged): Wire the Student Portal to real student data, pending the AI Working Committee review; consolidate Classroom Tracker's three ad-hoc avatar implementations onto the shared generator; have the proposed `firestore.rules` changes reviewed; real Student Portal authentication; Learning Hub; role-based routing; all previously-listed items.

@@ -5,7 +5,7 @@
  * product-specific screen or auth check. Purely a product picker: two
  * journeys, "Continue as Teacher" (into the existing Classroom Tracker
  * app, unchanged) and "Continue as Student" (a placeholder for now —
- * see StudentPlaceholderView.js). No Google sign-in happens here; each
+ * see ui/student-portal/). No Google sign-in happens here; each
  * product's own auth flow (today, just Classroom Tracker's) still runs
  * exactly as it always has, once a visitor has picked a journey.
  *

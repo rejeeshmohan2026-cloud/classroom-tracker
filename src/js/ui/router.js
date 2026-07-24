@@ -6,7 +6,7 @@
  *   #/                                        -> Bloom Labs landing page (product picker)
  *   #/teacher                                 -> Classroom Tracker home (or welcome, decided by main.js) — the
  *                                                 existing teacher app's own entry point, unchanged in behavior
- *   #/student                                 -> Student Portal placeholder ("coming soon")
+ *   #/student/{section?}                      -> Student Portal (home/achievements/team/learn/profile; home if omitted)
  *   #/classroom/{id}                          -> dashboard (the classroom's landing page)
  *   #/classroom/{id}/class-mode               -> tracker (today's Class Mode — unchanged, just relocated)
  *   #/classroom/{id}/settings/{section?}      -> settings
@@ -78,7 +78,8 @@ function parseHash() {
   }
 
   if (parts[0] === 'student') {
-    return { name: 'studentPlaceholder' };
+    const section = parts[1] || 'home';
+    return { name: 'studentPortal', section };
   }
 
   if (parts.length === 0) {
