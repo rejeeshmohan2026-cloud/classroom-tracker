@@ -1,10 +1,3832 @@
 /*
- * Global stylesheet — placeholder.
+ * Global stylesheet — Product Architecture Refactor.
  *
- * No UI has been built yet as part of this milestone. This file exists to
- * complete the project structure. Future milestones will add:
- *   - CSS custom properties (design tokens: colour, spacing, type scale)
- *   - Base/reset styles
- *   - Layout styles for classroom and student views
- *   - Component-specific styles (organised alongside ui/components/)
+ * Palette and type follow Teach For India brand guidelines: TFI Cyan as
+ * the primary accent, Open Sans throughout, black/near-black text on
+ * white/light-neutral surfaces.
  */
+
+:root {
+  /* -------------------------------------------------------------
+   * Raw palette — unchanged values from before this phase. Every
+   * component should now reference the SEMANTIC layer below instead
+   * of these directly; kept here as the source those semantic tokens
+   * point to. TFI Lime Green and TFI Orange are added here because the
+   * brand guide already documents them for exactly the roles this
+   * phase needed (see the semantic layer's comments) — not invented.
+   * ------------------------------------------------------------- */
+  --color-cyan: #0ec0e2;
+  --color-cyan-dark: #0a94ae;
+  --color-yellow: #ffd337;
+  --color-danger: #e15344;
+  --color-lime: #b7c930;
+  --color-orange: #ff9629;
+  --color-pink: #ef5879;
+  --color-gold: #c9971f;
+  --color-ink: #1a1a1a;
+  --color-muted: #55606a;
+  --color-bg: #f5f8fa;
+  --color-surface: #ffffff;
+  --color-border: #e2e8ed;
+
+  /* -------------------------------------------------------------
+   * Semantic colors — what a component should actually reference.
+   * ------------------------------------------------------------- */
+  --color-primary: var(--color-cyan);
+  --color-primary-strong: var(--color-cyan-dark);
+  /* A richer, darker blue for solid fills that need genuinely WHITE
+     text (buttons, KPI cards, gradients) — plain --color-primary is too
+     light for white text to pass contrast (2.17:1); even
+     --color-primary-strong isn't dark enough (3.58:1). This is,
+     verified at 4.81:1. */
+  --color-primary-deep: #1565c0; /* unified flat blue — this is the accent color a teacher can choose between 5 options for; see config/accentColorConfig.js and services/accentColorService.js, which override this and the two tokens below via inline style once a preference loads */
+  /* Paired with --color-primary-deep: some of the 5 accent options are
+     light enough that white text fails (Ocean 2.64:1, Sunset 3.19:1) —
+     dark ink is what actually passes for those two. Every option's
+     correct pairing is computed once, in accentColorConfig.js, not
+     re-derived here; these are just the Classic-matching defaults so
+     the app looks right before any preference has loaded. */
+  --color-on-primary-deep: #ffffff;
+  --shadow-on-primary-deep: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --color-success: var(--color-lime); /* TFI Lime Green — brand's documented "secondary accent"; reads as complete/positive */
+  --color-warning: var(--color-yellow); /* TFI Yellow — unchanged, already this role today */
+  --color-accent: var(--color-gold); /* TFI-adjacent gold — replaces orange per explicit direction ("not liking the orange theme"); ties to trophy/star imagery already in Recognition */
+
+  /* Deliberately theme-independent — never redefined inside [data-theme="dark"]
+   * (see Phase 6A). This is for text/icons placed ON TOP OF a brand-color
+   * fill (--color-primary/--color-warning/--color-accent/--color-success),
+   * as opposed to --color-ink, which is page-background text and MUST
+   * flip between themes. The brand colors themselves don't change between
+   * light and dark — so the text sitting on them shouldn't either. Using
+   * --color-ink here would silently break (Phase 5's white-on-cyan fix
+   * would invert into near-white-on-cyan under a dark theme, when
+   * --color-ink flips light-on-dark).
+   */
+  --color-on-brand: #1a1a1a;
+
+  /* Also theme-independent, for the same reason as --color-on-brand:
+   * the top user-bar (ui/components/UserBar.js) was always meant to be
+   * a fixed dark accent strip, not something that inverts with the
+   * page theme. Using --color-ink/--color-surface there (as it did
+   * before Phase 6A) would flip it into a LIGHT bar under dark theme —
+   * the opposite of "a consistent app chrome the content area sits
+   * inside of." Caught by actually looking at a dark-mode screenshot,
+   * not assumed.
+   */
+  --color-chrome-bg: #1a1a1a;
+  --color-chrome-text: #ffffff;
+
+  /* -------------------------------------------------------------
+   * Spacing scale — a 4px-based rhythm most of today's ad hoc padding
+   * values already approximate; Stage 3 migrates components onto it.
+   * ------------------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  /* -------------------------------------------------------------
+   * Radius scale — --radius-card/--radius-control unchanged;
+   * --radius-pill formalizes what chips/badges already do ad hoc.
+   * ------------------------------------------------------------- */
+  --radius-control: 8px;
+  --radius-card: 14px;
+  --radius-pill: 999px;
+
+  /* -------------------------------------------------------------
+   * Elevation scale — Flat -> Card -> Hover -> Sheet -> Dialog.
+   * --shadow-card (below, unchanged) stays defined until Stage 3
+   * migrates its call sites onto --elevation-card (same value).
+   * ------------------------------------------------------------- */
+  --elevation-flat: none;
+  --elevation-card: 0 2px 10px rgba(15, 30, 40, 0.08);
+  --elevation-hover: 0 4px 16px rgba(15, 30, 40, 0.12);
+  --elevation-sheet: 0 8px 24px rgba(15, 30, 40, 0.16);
+  --elevation-dialog: 0 12px 40px rgba(15, 30, 40, 0.22);
+
+  /* -------------------------------------------------------------
+   * Typography scale + font-weight tokens.
+   * ------------------------------------------------------------- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.4rem;
+  --text-2xl: 1.75rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 800;
+
+  /* -------------------------------------------------------------
+   * Motion tokens. Core principle for this whole project, not just
+   * this file: MOTION COMMUNICATES, NEVER ENTERTAINS. Every duration/
+   * easing pair below exists because some interaction needs to say
+   * something (this is clickable, this just changed, this is worth a
+   * beat of attention) — never because it looks nice on its own.
+   *
+   * Only ONE easing curve exists, deliberately, including for
+   * Recognition: those moments stay a plain fade + small lift, never a
+   * bounce or overshoot, per an explicit product decision that
+   * celebration should still feel calm in a classroom used for hours
+   * every day — so there is no separate "celebratory easing," only a
+   * slightly longer celebratory *duration*.
+   * ------------------------------------------------------------- */
+  --duration-instant: 100ms; /* state toggles — button press, checkbox */
+  --duration-fast: 150ms; /* hover feedback */
+  --duration-base: 200ms; /* most transitions — card hover, expand/collapse, resolution */
+  --duration-celebratory: 350ms; /* Recognition and star-award moments only */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  --radius-card: 14px;
+  --radius-control: 8px;
+  --shadow-card: 0 2px 10px rgba(15, 30, 40, 0.08);
+  --font-body: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/*
+ * Dark theme (Phase 6A) — overrides ONLY the theme-dependent tokens
+ * (page background, surface, body text, muted text, borders). Brand
+ * colors (--color-primary/--color-success/--color-warning/--color-accent/
+ * --color-danger) and --color-on-brand are DELIBERATELY not redefined
+ * here — brand colors don't change between themes, and --color-on-brand
+ * exists specifically to stay constant regardless of theme (see its
+ * definition above).
+ *
+ * Every value below was checked against WCAG AA before being chosen —
+ * see CHANGELOG.md's Phase 6A entry for the actual computed ratios.
+ * Applied via `document.documentElement.dataset.theme = 'dark'`
+ * (see services/themeService.js), not a class, so it composes cleanly
+ * with a future theme pack using the same [data-theme="..."] pattern.
+ */
+[data-theme='dark'] {
+  --color-bg: #14181b;
+  --color-surface: #1f2428;
+  --color-ink: #f0f2f4;
+  --color-muted: #9aa5ad;
+  --color-border: #333b41;
+  /* A dark shadow (the light-mode elevation values) is nearly
+     invisible against an already-dark canvas — cards need their own
+     dark-mode elevation to actually separate from the page now that
+     borders are being reduced in favor of elevation. A thin top
+     highlight plus a stronger, more opaque shadow reads correctly on
+     dark surfaces where the light-mode values would not. */
+  --elevation-card: 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 10px rgba(0, 0, 0, 0.3);
+  --elevation-hover: 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 16px rgba(0, 0, 0, 0.35);
+  --elevation-sheet: 0 1px 0 rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --elevation-dialog: 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  transition: background-color var(--duration-base) var(--ease-standard), color var(--duration-base) var(--ease-standard);
+}
+
+/*
+ * Phase 7B — forms. Previously relied entirely on browser defaults
+ * beyond font — no consistent border/radius/background across the app.
+ * Focus gets a subtle background tint (not just the accessibility
+ * outline below), so the field itself, not only its outline, shows
+ * active state.
+ */
+input,
+select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+input:focus,
+select:focus {
+  border-color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  outline: none;
+}
+
+/* Buttons (shared across every screen) */
+
+.btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-bold);
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius-control);
+  border: 2px solid transparent;
+  background-color: transparent;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+/*
+ * Icon-only variant — "keep it clean by replacing text with icons."
+ * Square, centered, sized for a single glyph; aria-label/title on the
+ * button itself carry what the text used to say, so this stays
+ * accessible even without visible text.
+ */
+.btn--icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1.2rem;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/*
+ * Loading state — the sixth and last of this app's formalized button
+ * states (default, hover, pressed, focused, disabled, loading). Static
+ * for now, deliberately: this stage is visual-system cleanup, not
+ * motion — the ring below gets its actual spin animation in the Stage 5
+ * motion rollout, once the visual system underneath it is stable.
+ */
+.btn[aria-busy='true'] {
+  pointer-events: none;
+  color: transparent;
+  position: relative;
+}
+.btn[aria-busy='true']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border: 2px solid var(--color-surface);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+.btn--ghost[aria-busy='true']::after,
+.btn--text[aria-busy='true']::after {
+  border-color: var(--color-primary);
+  border-top-color: transparent;
+}
+
+.btn--primary {
+  /* Same approved gradient as every header — applied to every Primary
+     button across the app, per explicit direction. Contrast math
+     already verified for these exact stops (see .classroom-hero's
+     comment): 5.49:1/3.3:1 with white text, using the WCAG large-text
+     exception since this button's text is bold — same honest tradeoff
+     already agreed on for the Hero. */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+  border-color: transparent;
+  /* Phase 7B — intent hierarchy: Action-intent buttons (this one) get
+     real size distinction from Navigation/Utility buttons (Ghost/Text
+     below), not just a fill color — so priority is felt, not just seen. */
+  font-size: var(--text-base);
+  padding: 0.75rem 1.4rem;
+  border-radius: 10px;
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+.btn--primary:hover:not(:disabled) {
+  /* Darkened from the new flat --color-primary-deep, so hover reads as
+     "pressing in." */
+  background-color: color-mix(in srgb, var(--color-primary-deep) 80%, black);
+  border-color: color-mix(in srgb, var(--color-primary-deep) 80%, black);
+}
+
+.btn--ghost {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+}
+.btn--ghost:hover:not(:disabled) {
+  background-color: rgba(14, 192, 226, 0.1);
+}
+
+.btn--danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.btn--danger:hover:not(:disabled) {
+  background-color: rgba(225, 83, 68, 0.08);
+}
+
+.btn--text {
+  color: var(--color-ink);
+  padding: 0.6rem 0.5rem;
+}
+.btn--text:hover:not(:disabled) {
+  color: var(--color-primary-strong);
+}
+
+.btn--danger-text {
+  color: var(--color-danger);
+}
+.btn--danger-text:hover:not(:disabled) {
+  color: #b8382c;
+}
+
+.btn--large {
+  font-size: 1.05rem;
+  padding: 0.85rem 1.75rem;
+}
+
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.student-row__surface:focus-visible,
+.student-row__more:focus-visible,
+.wizard-checklist__row:focus-visible,
+.dashboard-widget__chip:focus-visible,
+.waypoint-list__chip:focus-visible,
+.huddle-list__row:focus-visible,
+.checklist__label--button:focus-visible,
+.leaderboard-list__toggle:focus-visible,
+.recognition-screen__category-chip:focus-visible {
+  outline: 3px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+/* Welcome view (first launch, no classrooms yet) */
+
+.welcome-view {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 1rem;
+}
+
+.welcome-view__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.welcome-view__title {
+  font-size: 1.75rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.welcome-view__subtitle {
+  font-size: 1rem;
+  color: var(--color-muted);
+  margin: 0 0 0.75rem;
+  line-height: 1.5;
+}
+
+/*
+ * Bloom Labs landing page — the platform's own entry point, one level
+ * above any single product. Reuses .welcome-view's title/subtitle
+ * typography scale rather than inventing a parallel one, since this is
+ * structurally the same "centered, title + subtitle" pattern; only the
+ * two-journey-card layout below is genuinely new.
+ */
+.landing-view {
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 1rem;
+}
+
+.landing-view__title {
+  font-size: 2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.landing-view__subtitle {
+  font-size: 1rem;
+  color: var(--color-muted);
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.landing-view__journeys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: center;
+  width: 100%;
+}
+
+.landing-view__journey-card {
+  flex: 1 1 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  padding: 2rem 1.5rem;
+}
+
+.landing-view__journey-icon {
+  font-size: 2rem;
+}
+
+.landing-view__journey-title {
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.landing-view__journey-description {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+  min-height: 3.5em;
+}
+
+/* Home view (classroom dashboard) */
+
+.home-view {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.home-view__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.home-view__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.home-view__title {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.classroom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.classroom-card {
+  text-align: left;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  padding: 1.25rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform var(--duration-instant) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-base) var(--ease-standard);
+}
+.classroom-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.classroom-card__name {
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.25rem;
+}
+
+.classroom-card__subtitle {
+  margin: 0 0 0.5rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.classroom-card__meta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* Modal (New Classroom) */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(26, 26, 26, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.modal {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  padding: 1.75rem;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal--wide {
+  max-width: 560px;
+}
+
+.import-preview {
+  margin-bottom: 1.25rem;
+}
+
+.import-preview__summary {
+  margin: 0 0 1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-strong);
+}
+
+.import-preview__team {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.import-preview__team:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.import-preview__team-heading {
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.35rem;
+}
+
+.import-preview__team-students {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.import-preview__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-weight: var(--font-weight-medium);
+}
+
+.modal__heading {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-black);
+}
+
+.modal__description {
+  margin: -0.5rem 0 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+.modal__error {
+  margin: -0.5rem 0 1rem;
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.modal__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.modal__form {
+  margin-bottom: 1.25rem;
+}
+
+.modal__input {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.modal__actions--stacked {
+  flex-direction: column;
+}
+
+/* Tracker view */
+
+.tracker-view {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tracker-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  /* Applied across every page's header, per explicit direction — same
+     gradient/contrast approach approved for the Dashboard Hero (see
+     .classroom-hero's own comment for the full contrast math). */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+}
+/*
+ * The Dashboard's own header (ClassroomHeader.js) is excluded from the
+ * rule above — it already has its own colorful moment nested inside
+ * (.classroom-hero), and Primary Action / Secondary Content need to
+ * stay on a plain surface so their own white cards (Start Class Mode,
+ * Continue Working) read clearly rather than floating on a second,
+ * competing gradient. Higher specificity here (two classes) correctly
+ * overrides the single-class rule above regardless of source order.
+ */
+.classroom-header {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tracker-header__title-block {
+  flex: 1;
+  min-width: 160px;
+}
+
+.tracker-header__title {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-black);
+  margin: 0;
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.tracker-header__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+/* Back/secondary buttons inside any gradient header need light text —
+   .btn--text's default (--color-ink, dark) was designed for a white
+   header background, which no longer applies here. */
+.tracker-header .btn--text,
+.settings-header .btn--text,
+.profile-header .btn--text {
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+.tracker-header .btn--text:hover,
+.settings-header .btn--text:hover,
+.profile-header .btn--text:hover {
+  color: var(--color-warning);
+}
+/*
+ * Ghost/Danger buttons inside a header were styled for a white
+ * background (cyan/red border+text) — on the header's flat blue, that
+ * pairing has genuinely poor contrast (similar hues, in Ghost's case).
+ * White-based styling here, matching the Back/Text button treatment
+ * above; Danger keeps a distinct solid red fill (darkened slightly so
+ * white text passes) so a destructive action still reads as visually
+ * different, not just another ghost button.
+ */
+.tracker-header .btn--ghost {
+  border-color: color-mix(in srgb, var(--color-on-primary-deep) 60%, transparent);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+.tracker-header .btn--ghost:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-on-primary-deep) 15%, transparent);
+  border-color: var(--color-on-primary-deep);
+}
+.tracker-header .btn--danger {
+  border-color: transparent;
+  background-color: #b44236; /* darkened danger red — verified 5.57:1 with white text, plain danger-red only reaches 3.8:1 */
+  color: #ffffff; /* fixed — this is a fixed red, not the accent color, so it doesn't follow the dynamic text-color token */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+.tracker-header .btn--danger:hover:not(:disabled) {
+  background-color: #9c392e;
+}
+/* The Dashboard's own header stays on a plain surface (see .classroom-header
+   above), so its title/subtitle/back-button text should NOT inherit the
+   white treatment meant for gradient headers — reset back to normal ink. */
+.classroom-header .tracker-header__title,
+.classroom-header .tracker-header__subtitle {
+  color: var(--color-ink);
+  text-shadow: none;
+}
+
+/*
+ * The Hero (classroom-context slot inside ClassroomHeader — see
+ * DashboardView.js). Deliberately timeless: a greeting and the
+ * classroom's identity, not a dashboard summary — no live stats or
+ * counts belong here, those already have their own widgets below.
+ */
+.classroom-hero__greeting {
+  margin: 0 0 0.1rem;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+.classroom-hero__motto {
+  margin: 0.3rem 0 0;
+  font-size: var(--text-sm);
+  font-style: italic;
+  color: var(--color-muted);
+}
+
+.tracker-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+  padding: 1.5rem;
+}
+
+.team-card {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  background-color: var(--color-primary-deep);
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.team-card__name {
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.team-card__total {
+  font-size: 1.3rem;
+  font-weight: var(--font-weight-black);
+  background-color: rgba(255, 255, 255, 0.22);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-pill);
+  min-width: 2.25rem;
+  text-align: center;
+}
+
+.student-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.student-row {
+  border-radius: var(--radius-control);
+  border-left: 4px solid transparent;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+
+.student-row__surface {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0.85rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  cursor: pointer;
+  user-select: none;
+  touch-action: pan-y;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.student-row__surface--dragging {
+  transition: none;
+}
+.student-row__surface:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.student-row__more {
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+}
+.student-row__more:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--color-ink);
+}
+
+.student-row__name {
+  font-weight: var(--font-weight-medium);
+}
+
+.student-row__points {
+  font-weight: var(--font-weight-black);
+  color: var(--color-primary-strong);
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+/* Empty state (no classroom imported yet / no teams in a classroom) */
+
+.empty-state {
+  grid-column: 1 / -1;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.empty-state__message {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+/* Settings view */
+
+.settings-view {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+}
+
+.settings-header__title {
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem 0;
+}
+
+.settings-tabs__tab {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-bold);
+  padding: 0.55rem 0.9rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.settings-tabs__tab--active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-primary);
+}
+
+.settings-content {
+  padding: 1.5rem;
+}
+
+.settings-section {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1.5rem;
+}
+
+.settings-section--danger {
+  border-color: var(--color-danger);
+}
+
+.settings-section__divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.25rem 0;
+}
+
+.settings-section__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.settings-section__input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.settings-section__meta {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin: 1rem 0 0;
+}
+
+.settings-team-block {
+  margin-bottom: 1.75rem;
+}
+.settings-team-block:last-child {
+  margin-bottom: 0;
+}
+
+.settings-team-block__heading {
+  font-size: 1rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.6rem;
+}
+
+/* Classroom ID (join code) display — Settings > Teachers, owner-only. */
+.join-code-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.join-code-display__value {
+  font-family: 'Courier New', monospace;
+  font-size: 1.4rem;
+  font-weight: var(--font-weight-black);
+  letter-spacing: 0.15em;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 1rem;
+}
+
+.settings-editable-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-editable-list__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.settings-editable-list__item input[type='text'] {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.member-row__label {
+  flex: 1;
+  font-weight: var(--font-weight-medium);
+}
+
+.settings-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.settings-add-form input[type='text'] {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.settings-add-form select {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.permissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.permissions-table th,
+.permissions-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.permissions-table__cell {
+  text-align: center;
+}
+
+/* Setup Wizard */
+
+.wizard-overview {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.wizard-overview__title {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.5rem;
+}
+
+.wizard-overview__subtitle {
+  color: var(--color-muted);
+  margin: 0 0 1.5rem;
+}
+
+.wizard-progress {
+  margin-bottom: 1.5rem;
+}
+
+.wizard-progress__track {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.wizard-progress__fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-pill);
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+.wizard-progress__label {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+}
+
+.wizard-checklist {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.wizard-checklist--compact {
+  margin-bottom: 1rem;
+}
+
+.wizard-checklist__row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: default;
+}
+
+button.wizard-checklist__row {
+  cursor: pointer;
+}
+button.wizard-checklist__row:hover {
+  border-color: var(--color-primary);
+  background-color: rgba(14, 192, 226, 0.06);
+}
+
+.wizard-checklist__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  font-size: 0.8rem;
+  color: transparent;
+  flex-shrink: 0;
+}
+
+.wizard-checklist__icon--done {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-on-brand);
+}
+
+.wizard-checklist__label {
+  font-weight: var(--font-weight-medium);
+}
+
+.wizard-step-screen {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.wizard-step-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+}
+
+.wizard-step-header__title {
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.wizard-step-content {
+  padding: 0 1.5rem 2rem;
+}
+
+.wizard-step__intro {
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+}
+
+.wizard-step__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.wizard-field {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  margin-bottom: 1rem;
+}
+
+.wizard-field input {
+  display: block;
+  width: 100%;
+  max-width: 200px;
+  margin-top: 0.4rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.wizard-checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+
+.wizard-checkbox-field--disabled {
+  color: var(--color-muted);
+}
+
+.wizard-badge {
+  display: inline-block;
+  background-color: var(--color-yellow);
+  color: var(--color-on-brand);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-black);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-pill);
+  margin-bottom: 1rem;
+}
+
+.wizard-group-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.wizard-group-row__name {
+  flex: 1;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.color-swatch-picker {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.color-swatch {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-swatch--selected {
+  border-color: var(--color-ink);
+}
+
+.wizard-bucket-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.wizard-bucket-table__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.wizard-bucket-table__row--header {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.wizard-bucket-table__row select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.settings-progress-block {
+  margin-bottom: 1.5rem;
+}
+
+/* Student Profile */
+
+.profile-view {
+  max-width: 720px;
+  margin: 0 auto;
+  padding-bottom: 2rem;
+}
+
+.profile-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.profile-stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-stat-card__label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.profile-stat-card__value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-black);
+}
+
+.profile-stat-card__select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+}
+
+.profile-section {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.profile-section__heading {
+  font-size: 1.05rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.75rem;
+}
+
+.profile-section__meta {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.profile-log-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.profile-log-form__points {
+  width: 80px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.profile-log-form__reason {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.timeline__item:last-child {
+  border-bottom: none;
+}
+
+.timeline__label {
+  font-weight: var(--font-weight-medium);
+}
+
+.timeline__label--positive {
+  color: #1e8a3c;
+}
+
+.timeline__label--negative {
+  color: var(--color-danger);
+}
+
+.timeline__date {
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* Student Profile — header & tabs */
+
+.profile-header {
+  padding: 1.25rem 1.5rem 1.5rem;
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+}
+
+.profile-header__title-block {
+  margin: 0.75rem 0 1rem;
+}
+
+.profile-header__name {
+  font-size: 1.4rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.profile-header__group {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.profile-header__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.profile-header__chip {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius-control);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 100px;
+}
+
+.profile-header__chip-label {
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+}
+
+.profile-header__chip-value {
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-black);
+}
+
+.profile-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 1rem 1.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.profile-tabs__tab {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-bold);
+  padding: 0.6rem 0.9rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.profile-tabs__tab--active {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-primary);
+}
+
+.profile-tab-content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.profile-group-card {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.profile-group-card__swatch {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* Achievements */
+
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.achievement-card {
+  position: relative;
+  background: linear-gradient(160deg, #fffbea, #fff3c4);
+  border: 1px solid #f2d477;
+  border-radius: var(--radius-card);
+  padding: 1rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  text-align: center;
+}
+
+.achievement-card__icon {
+  font-size: 1.5rem;
+  color: #b7791f;
+}
+
+.achievement-card__label {
+  font-weight: var(--font-weight-bold);
+  font-size: 0.85rem;
+}
+
+.achievement-card__remove {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: var(--color-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+.achievement-card__remove:hover {
+  color: var(--color-danger);
+}
+
+/* Notes */
+
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.note-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.15rem;
+}
+
+.note-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-bottom: 0.4rem;
+}
+
+.note-card__teacher {
+  font-weight: var(--font-weight-bold);
+}
+
+.note-card__content {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Learning Activities */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.activity-card,
+.activity-list-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1rem 1.15rem;
+  text-align: left;
+  font-family: inherit;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.activity-list-card {
+  cursor: pointer;
+  width: 100%;
+}
+.activity-list-card:hover {
+  border-color: var(--color-primary);
+}
+
+.activity-card__title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.activity-card__title {
+  font-weight: var(--font-weight-black);
+}
+
+.activity-card__type {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.status-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-bold);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-pill);
+  background-color: #eef1f4;
+  color: var(--color-muted);
+}
+.status-badge--submitted {
+  background-color: #e4f5e8;
+  color: #1e8a3c;
+}
+.status-badge--submitted-late {
+  background-color: #fff3d6;
+  color: #b7791f;
+}
+.status-badge--missing {
+  background-color: #fbe4e2;
+  color: var(--color-danger);
+}
+.status-badge--resubmitted {
+  background-color: #e2effb;
+  color: var(--color-primary-strong);
+}
+
+.new-activity-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.new-activity-form input,
+.new-activity-form select {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activities-view {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.activity-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.activity-roster-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.activity-roster-row__name {
+  flex: 1;
+  min-width: 160px;
+  font-weight: var(--font-weight-medium);
+}
+
+.activity-roster-row__feedback {
+  flex: 1;
+  min-width: 160px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activity-roster-row__score {
+  width: 80px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.activity-roster-row select {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+/* Modal additions: toggle group + divider (Log Participation / Award Badge) */
+
+.modal__toggle-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.modal__toggle {
+  flex: 1;
+  font-family: inherit;
+  font-weight: var(--font-weight-bold);
+  padding: 0.6rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: none;
+  cursor: pointer;
+  color: var(--color-muted);
+}
+.modal__toggle--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary-strong);
+  background-color: rgba(14, 192, 226, 0.08);
+}
+
+.modal__divider {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+
+/* Toast notifications */
+
+.toast-container {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  background-color: var(--color-ink);
+  color: var(--color-surface);
+  font-weight: var(--font-weight-medium);
+  font-size: 0.9rem;
+  padding: 0.65rem 1.1rem;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity var(--duration-base) var(--ease-standard), transform var(--duration-base) var(--ease-standard);
+}
+.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Bottom sheet (Quick Actions) */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(26, 26, 26, 0);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 250;
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+.sheet-overlay--visible {
+  background-color: rgba(26, 26, 26, 0.45);
+}
+
+.bottom-sheet {
+  width: 100%;
+  max-width: 480px;
+  background-color: var(--color-surface);
+  border-radius: 20px 20px 0 0;
+  padding: 0.75rem 1.25rem 1.5rem;
+  transform: translateY(100%);
+  transition: transform var(--duration-base) var(--ease-standard);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+}
+.bottom-sheet--visible {
+  transform: translateY(0);
+}
+
+.bottom-sheet__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-border);
+  margin: 0 auto 0.85rem;
+}
+
+.bottom-sheet__name {
+  font-size: 1.15rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+  text-align: center;
+}
+
+.bottom-sheet__bucket {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  margin: 0.2rem 0 1rem;
+}
+
+.bottom-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.bottom-sheet__action {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  background-color: var(--color-bg);
+  border: none;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+.bottom-sheet__action:hover {
+  background-color: rgba(14, 192, 226, 0.1);
+}
+
+.bottom-sheet__action-icon {
+  font-size: 1.3rem;
+  width: 1.6rem;
+  text-align: center;
+}
+
+.bottom-sheet__cancel {
+  width: 100%;
+  padding: 0.9rem 1rem;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  background: none;
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+}
+
+/* Score-pulse animation (plays once on mount; safe since every action
+   fully re-renders, so this is always a freshly created element) */
+
+@keyframes score-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.student-row__points--pulse,
+.team-card__total--pulse {
+  animation: score-pulse var(--duration-celebratory) var(--ease-standard);
+}
+
+/* Loading spinner (see .btn[aria-busy='true'] above). Continuous loops
+   like this deliberately don't use one of the one-shot interaction
+   durations (100/150/200/350ms) — those exist to time a single state
+   change, not an infinite loop — 0.6s linear is simply a calm, legible
+   spin speed. */
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Login (Google Sign-In) */
+
+.login-view {
+  max-width: 400px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 0.75rem;
+}
+
+.login-view__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+
+.login-view__subtitle {
+  color: var(--color-muted);
+  margin: 0 0 1rem;
+}
+
+.login-view__google-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.login-view__google-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background-color: var(--color-surface);
+  color: var(--color-primary-strong);
+  font-weight: var(--font-weight-black);
+  font-size: 0.9rem;
+}
+
+/* Persistent user bar (shown above every screen once signed in) */
+
+.user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem;
+  background-color: var(--color-chrome-bg);
+  color: var(--color-chrome-text);
+}
+
+.user-bar__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.user-bar__avatar {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-bar__avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-primary);
+  color: var(--color-on-brand);
+  font-weight: var(--font-weight-black);
+  font-size: 0.85rem;
+}
+
+.user-bar__name {
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-bar .btn--text {
+  color: var(--color-chrome-text);
+  flex-shrink: 0;
+}
+.user-bar .btn--text:hover {
+  color: var(--color-primary);
+}
+
+/* The theme selector lives permanently inside the fixed-dark chrome
+   bar — its unselected state can't use --color-muted/--color-border
+   (designed for text on the page background, which DOES flip with
+   theme) since the bar itself never does. Verified against
+   --color-chrome-bg specifically: #b8bcc0 text = 9.11:1, #6b7075
+   border = 3.48:1 (WCAG requires 3.0 for UI component borders). */
+/*
+ * Accent color picker — 5 swatches, replacing the retired
+ * Light/Dark/System theme selector in the same spot. Sits on the
+ * user-bar's fixed dark chrome background (--color-chrome-bg), so the
+ * ring/border treatment is verified against that specific fixed dark
+ * tone, not against whichever accent color happens to be active.
+ */
+.user-bar__right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.user-bar__color-editor {
+  position: relative;
+}
+/* Icon-only per explicit direction — no "Edit" text label, just the
+   current-color swatch and a pencil icon. */
+.user-bar__color-edit-button {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.5rem;
+  cursor: pointer;
+}
+.user-bar__color-edit-button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.user-bar__color-edit-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+.user-bar__color-edit-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+/*
+ * The popover — anchored just below the Edit button, hidden by default.
+ * A small, self-contained panel rather than this app's existing
+ * full-screen bottom-sheet pattern (QuickActionsSheet.js), which would
+ * be disproportionate for a small settings tweak like this one.
+ */
+.user-bar__color-popover {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background-color: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-dialog);
+  padding: 0.75rem;
+  gap: 0.65rem;
+  z-index: 20;
+}
+.user-bar__color-popover--open {
+  display: flex;
+}
+.user-bar__color-presets {
+  display: flex;
+  gap: 0.5rem;
+}
+.user-bar__color-swatch {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.user-bar__color-swatch:hover {
+  transform: scale(1.1);
+}
+.user-bar__color-swatch--active {
+  border-color: var(--color-ink);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+
+/*
+ * The real spectrum/gradient picker — a hue-tinted square (saturation
+ * left-to-right, value/lightness top-to-bottom, via two overlaid CSS
+ * gradients) with a draggable marker dot, plus a separate hue strip.
+ * This is what "spectrum color picker" specifically meant: an inline
+ * visual control, not the browser's native OS color dialog.
+ */
+.spectrum-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 200px;
+}
+.spectrum-picker__square {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  border-radius: var(--radius-control);
+  background-image: linear-gradient(to top, #000000, transparent), linear-gradient(to right, #ffffff, transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+.spectrum-picker__marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.spectrum-picker__hue-slider {
+  position: relative;
+  width: 100%;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background-image: linear-gradient(
+    to right,
+    #ff0000 0%,
+    #ffff00 17%,
+    #00ff00 33%,
+    #00ffff 50%,
+    #0000ff 67%,
+    #ff00ff 83%,
+    #ff0000 100%
+  );
+  cursor: pointer;
+  touch-action: none;
+}
+.spectrum-picker__hue-handle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Notebook Tracker — Register View (fast entry) and Timeline View (read-only) */
+
+.notebook-checking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.notebook-checking-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+/*
+ * Compact status dropdowns — replacing a row of toggle buttons per
+ * status option (which grows wider and more overwhelming every time a
+ * new status gets added). A select's width doesn't change no matter
+ * how many options it holds.
+ */
+.notebook-status-select {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.notebook-status-select__label {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.notebook-status-select__input {
+  min-width: 9rem;
+}
+
+.notebook-checking-row__name {
+  flex: 1 1 160px;
+  font-weight: var(--font-weight-medium);
+  min-width: 140px;
+}
+
+.toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.toggle-group__button {
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-bold);
+  padding: 0.4rem 0.65rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
+}
+.toggle-group__button:hover {
+  border-color: var(--color-primary);
+}
+.toggle-group__button--active {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: var(--color-on-brand);
+}
+
+.toggle-group__button:focus-visible {
+  outline: 3px solid var(--color-yellow);
+  outline-offset: 2px;
+}
+
+/* Date/month navigation bar (Register View + Timeline View) */
+
+.notebook-date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.5rem 1.5rem 1rem;
+}
+
+.notebook-date-bar__label {
+  font-weight: var(--font-weight-bold);
+  min-width: 10rem;
+  text-align: center;
+}
+
+.notebook-date-bar__today-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-primary);
+  color: var(--color-on-brand);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-black);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+/* Timeline strip (student-first: one row per student) */
+
+.notebook-timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.notebook-timeline-row:last-child {
+  border-bottom: none;
+}
+
+.notebook-timeline-row__label {
+  flex: 0 0 140px;
+  font-weight: var(--font-weight-medium);
+}
+
+.notebook-timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.notebook-timeline__day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  font-size: 0.95rem;
+  border-radius: 4px;
+  background-color: var(--color-bg);
+  cursor: default;
+}
+
+.notebook-timeline-legend {
+  letter-spacing: 0.02em;
+}
+
+/* Reduced motion — one consolidated policy for the whole app (was
+   previously split across two separate, duplicated blocks). Every
+   transition/animation declared anywhere above is disabled here in one
+   place, rather than re-declaring `transition: none` per component
+   as new motion gets added — see Stage 5 (motion rollout) for the
+   token-driven motion this consolidation is set up to support. */
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .btn,
+  .classroom-card,
+  .toggle-group__button,
+  .wizard-progress__fill,
+  .dashboard-widget,
+  .dashboard-widget__chip,
+  .checklist__row {
+    transition: none;
+  }
+  .btn:active {
+    transform: none;
+  }
+  .classroom-card:hover {
+    transform: none;
+  }
+  .student-row__points--pulse,
+  .team-card__total--pulse {
+    animation: none;
+  }
+  .toast,
+  .bottom-sheet,
+  .sheet-overlay,
+  .student-row__surface {
+    transition: none;
+  }
+  .btn[aria-busy='true']::after {
+    animation: none; /* falls back to the static ring — still communicates "loading", just without the spin */
+  }
+  .recognition-card {
+    animation: none;
+  }
+  .dashboard-widget__resolved-item {
+    transition: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .tracker-header,
+  .settings-header {
+    padding: 1rem;
+  }
+  .team-grid,
+  .settings-content,
+  .home-view {
+    padding: 1rem;
+  }
+  .notebook-checking-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .notebook-timeline-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Classroom Dashboard (Phase 2) — structural only, no visual polish yet
+   per this phase's explicit instructions; themes/animations come later. */
+
+.dashboard-view__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: 1.5rem;
+}
+
+/*
+ * Phase 7A — Spacing rhythm. Groups widgets that answer the same
+ * Dashboard question (see ui/views/DashboardView.js) with a SMALLER
+ * internal gap than the space between different questions above —
+ * whitespace now carries grouping information on its own, rather than
+ * relying solely on the small gray section labels to communicate it.
+ * Same widgets, same order — this only changes spacing, not the IA.
+ */
+.dashboard-view__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * Visual refresh — named emotional palettes. Sections CONSUME these
+ * rather than owning a color outright, so the same palette can travel
+ * to a downstream screen (Recognition Screen, Notebook Tracker,
+ * Settings > Groups) at whatever intensity fits that context, without
+ * every screen needing its own color decision. Every hue is a real TFI
+ * brand color (see docs/PROGRESS_ENGINE.md-adjacent brand notes in
+ * earlier CHANGELOG entries) — none invented.
+ *
+ * Two tokens per palette:
+ *   --palette-{name}-wash  — a SUBTLE background tint for a section's
+ *     own card (kept deliberately light — "breathable," per explicit
+ *     product direction — not a saturated fill)
+ *   --palette-{name}-label — text color for that section's small
+ *     identity label, verified against its own wash at 4.5:1+ in both
+ *     themes (see CHANGELOG's Visual Refresh entry for the exact
+ *     computed ratios)
+ * The palette's border/accent color is just the brand hue itself
+ * (--color-accent for Celebrate, --color-primary for Learn, etc.) —
+ * already an existing token, not duplicated here.
+ */
+:root {
+  --palette-celebrate-wash: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+  --palette-celebrate-label: color-mix(in srgb, var(--color-accent) 35%, var(--color-ink));
+
+  --palette-learn-wash: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  --palette-learn-label: color-mix(in srgb, var(--color-primary) 35%, var(--color-ink));
+
+  --palette-focus-wash: color-mix(in srgb, var(--color-warning) 6%, var(--color-surface));
+  --palette-focus-label: color-mix(in srgb, var(--color-warning) 35%, var(--color-ink));
+
+  --palette-growth-wash: color-mix(in srgb, var(--color-success) 6%, var(--color-surface));
+  --palette-growth-label: color-mix(in srgb, var(--color-success) 35%, var(--color-ink));
+
+  --palette-community-wash: color-mix(in srgb, var(--color-pink) 6%, var(--color-surface));
+  --palette-community-label: color-mix(in srgb, var(--color-pink) 35%, var(--color-ink));
+}
+[data-theme='dark'] {
+  --palette-celebrate-wash: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  --palette-learn-wash: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface));
+  --palette-focus-wash: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface));
+  --palette-growth-wash: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+  --palette-community-wash: color-mix(in srgb, var(--color-pink) 10%, var(--color-surface));
+}
+
+.dashboard-widget {
+  background-color: var(--color-surface);
+  border: 1px solid transparent;
+  box-shadow: var(--elevation-card);
+  border-radius: var(--radius-card);
+  padding: 1rem;
+  /* Theme cross-fade (Phase 6A) — see body's own transition above.
+     Deliberately not applied to every surface in the app (would mean
+     touching dozens of selectors for a purely cosmetic gain); this and
+     .classroom-card cover the two most common card wrappers. Other
+     elements' colors will snap instantly on theme switch rather than
+     cross-fade — a disclosed scope boundary, not an oversight. */
+  transition: background-color var(--duration-base) var(--ease-standard), border-color var(--duration-base) var(--ease-standard);
+}
+
+.dashboard-widget--cta {
+  display: flex;
+  justify-content: center;
+}
+
+.dashboard-widget__heading {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.dashboard-widget__subheading {
+  margin: 0.75rem 0 0.4rem;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.dashboard-widget__stat-line {
+  margin: 0;
+}
+
+/*
+ * Phase 7A — Typography. A shared utility for isolating a single "hero"
+ * number from its surrounding sentence/label, so the number — not the
+ * whole line — carries the visual weight. Deliberately NOT applied to
+ * every number in the app (e.g. Leaderboard rows stay compact/list-
+ * style, per the design review's "GitHub-style density" recommendation
+ * for data-dense areas) — only to genuinely standalone, single-stat
+ * displays.
+ */
+.stat-number {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-black);
+}
+
+.dashboard-widget__chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/*
+ * Phase 7B — navigational design language (Subjects). Chips connected
+ * by a thin line with a trailing chevron — a waypoint/breadcrumb
+ * metaphor, since this widget's whole job is navigation into Notebook
+ * Tracker. In dark mode the connector "lights up" (an accent tint)
+ * rather than just being recolored, echoing a lit path at night —
+ * reinforcing the metaphor instead of merely inverting it.
+ */
+.waypoint-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.waypoint-list__chip {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  padding: 0.4rem 0.75rem 0.4rem 1.6rem;
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard);
+}
+.waypoint-list__chip::before {
+  content: '';
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+}
+.waypoint-list__chip:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+.waypoint-list__connector {
+  width: 1.25rem;
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 0 0.4rem;
+}
+[data-theme='dark'] .waypoint-list__connector {
+  background-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+}
+.waypoint-list__chevron {
+  color: var(--color-muted);
+  font-size: 1.1rem;
+  margin-left: 0.5rem;
+}
+
+/*
+ * Phase 7B — collaborative design language (Groups). Small overlapping
+ * circular avatars per team (a "huddle") rather than a text chip — a
+ * group is fundamentally "a cluster of people," and the shape should
+ * say that before any label is read. Distinct from Recognition's single
+ * large ring-bordered avatar (one person, celebrated).
+ */
+.huddle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.huddle-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-family: inherit;
+  background: none;
+  border: none;
+  padding: 0.3rem 0;
+  cursor: pointer;
+  text-align: left;
+}
+.huddle-list__cluster {
+  display: flex;
+  flex-shrink: 0;
+}
+.huddle-list__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface));
+  color: var(--color-ink);
+  border: 2px solid var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  margin-left: -0.6rem;
+}
+/* Colorful avatars — cycling hues for visual variety within a huddle,
+   rather than one uniform tint. First-child override below keeps the
+   overlap order correct regardless of which hue lands first. */
+.huddle-list__avatar:nth-child(2) {
+  background-color: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+}
+.huddle-list__avatar:nth-child(3) {
+  background-color: color-mix(in srgb, var(--color-pink) 16%, var(--color-surface));
+}
+.huddle-list__avatar:first-child {
+  margin-left: 0;
+}
+.huddle-list__avatar--overflow {
+  background-color: var(--color-bg);
+  color: var(--color-muted);
+}
+.huddle-list__name {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+}
+
+.dashboard-widget__chip {
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+.dashboard-widget__chip:disabled {
+  cursor: not-allowed;
+}
+.dashboard-widget__chip:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--elevation-hover);
+}
+
+
+
+/*
+ * Phase 7B — editorial design language (Weekly Snapshot). Headline
+ * number (from Phase 7A's .stat-number) + a plain hairline-divided
+ * list, no icons or avatars as content — reads like a small report,
+ * not a UI panel. In dark mode the card itself loses its border and
+ * background entirely (see .dashboard-widget--editorial below): text
+ * sits directly on the page, leaning further into "editorial" rather
+ * than just recoloring the same panel.
+ */
+.editorial-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.editorial-list__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  margin-bottom: 0.35rem;
+  background-color: var(--color-bg);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+.editorial-list__row:last-child {
+  margin-bottom: 0;
+}
+.editorial-list__rank {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.75rem;
+}
+
+/*
+ * Rank badges — a colored circle + bold number, for ranks 1-3, used
+ * both here and in leaderboard-list__rank (Recognition Screen). Colors
+ * are darkened versions of gold/silver/bronze (mixed 70% into black) —
+ * verified at 4.99:1/4.84:1/6.76:1 with white text; the pure medal
+ * tones all failed white-text contrast outright (2.5-3.8:1).
+ */
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-black);
+}
+.rank-badge--1 {
+  background-color: #8d6a16; /* darkened gold */
+}
+.rank-badge--2 {
+  background-color: #6d727a; /* darkened silver */
+}
+.rank-badge--3 {
+  background-color: #815024; /* darkened bronze */
+}
+
+/*
+ * A colored left-border accent per strip, matching its rank badge —
+ * adapting the numbered-strip references (colored ring + colored
+ * accent bar on a horizontal card) to this app's existing row-strip
+ * layout.
+ */
+.editorial-list__row--rank-1,
+.leaderboard-list__row--rank-1 {
+  border-left: 4px solid #8d6a16;
+}
+.editorial-list__row--rank-2,
+.leaderboard-list__row--rank-2 {
+  border-left: 4px solid #6d727a;
+}
+.editorial-list__row--rank-3,
+.leaderboard-list__row--rank-3 {
+  border-left: 4px solid #815024;
+}
+
+.editorial-list__name {
+  flex: 1;
+}
+.editorial-list__value {
+  font-weight: var(--font-weight-bold);
+}
+
+/*
+ * White canvas principle: Weekly Snapshot is a normal white/surface
+ * card in both themes now — no special transparent or wash treatment.
+ * Its "editorial" identity comes from its content (a bold KPI number +
+ * a plain hairline list), not from the card's own background.
+ */
+
+/*
+ * The one bold, colored moment on Weekly Snapshot's otherwise white
+ * surface — a dedicated KPI card, not a full-widget wash. This is what
+ * "contrast creates hierarchy" means concretely: one confident colored
+ * element earns attention precisely because everything around it stays
+ * quiet.
+ */
+/*
+ * A solid, saturated color block — not a pale wash — matching the
+ * reference's "Attendance" treatment exactly: one confidently-colored
+ * box earns attention precisely because every surface around it is
+ * white. Text uses --color-on-brand (verified dark ink), the same
+ * pattern already established for every other solid-brand-color fill
+ * in this app (e.g. .btn--primary) — white text on TFI Cyan measures
+ * 2.17:1 and fails WCAG AA (see Phase 5's CHANGELOG entry); on-brand
+ * measures 8.0:1.
+ */
+.kpi-card {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background-color: var(--color-primary-deep);
+  border-radius: var(--radius-control);
+  padding: 0.85rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.kpi-card__icon {
+  font-size: 1.2rem;
+}
+.kpi-card__number {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-black);
+  color: var(--color-on-primary-deep);
+}
+.kpi-card__label {
+  font-size: var(--text-sm);
+  color: var(--color-on-primary-deep);
+}
+
+/*
+ * Visual refresh — one palette wash per widget container (not every
+ * sub-element inside it — "let the cards breathe," per explicit product
+ * direction). Inner content (leaderboard rows, checklist items, waypoint
+ * chips, avatars) stays neutral; only the outer card carries the tint.
+ */
+/*
+ * White canvas principle (supersedes the wash-per-card approach above):
+ * cards stay white/surface in every palette. Color is reserved for
+ * moments that deserve attention — a heading tint, an accent border, an
+ * icon, a badge, a hover state — never a full-card background fill.
+ * The --palette-{name}-wash tokens remain defined (still used for
+ * targeted accents like hover backgrounds below) but are no longer
+ * applied as a widget's own background-color.
+ */
+/*
+ * Recognition Wall — a dark "showcase" background, distinct from every
+ * other widget's plain white surface, so the white recognition cards
+ * inside genuinely pop rather than blending into the page. Reuses the
+ * app's one existing fixed-dark tone (--color-chrome-bg/--color-chrome-text,
+ * already used for the persistent top bar) rather than inventing a new
+ * dark color — this is a fixed, deliberate design choice, not tied to
+ * a theme system (there is only one theme).
+ */
+.dashboard-widget--recognition {
+  /* Same gradient as the Hero (see its comment for the contrast math
+     and the honest tradeoff being made). */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+}
+.dashboard-widget--recognition.dashboard-widget--celebrate .dashboard-widget__heading {
+  color: var(--color-chrome-text);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+.dashboard-widget--recognition .btn--text {
+  color: var(--color-chrome-text);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+.dashboard-widget--recognition .btn--text:hover {
+  color: var(--color-primary);
+}
+
+.dashboard-widget--celebrate .dashboard-widget__heading {
+  color: var(--palette-celebrate-label);
+}
+.dashboard-widget--learn .dashboard-widget__heading {
+  color: var(--palette-learn-label);
+}
+.dashboard-widget--focus .dashboard-widget__heading {
+  color: var(--palette-focus-label);
+}
+.dashboard-widget--growth .dashboard-widget__heading {
+  color: var(--palette-growth-label);
+}
+.dashboard-widget--community {
+  border-top: 3px solid var(--color-pink);
+}
+.dashboard-widget--community .dashboard-widget__heading {
+  color: var(--palette-community-label);
+}
+
+.dashboard-widget__cta-button {
+  font-size: 1.05rem;
+  padding: 0.75rem 2rem;
+}
+
+/* Dashboard section wrappers (Teaching / Classroom) — structural only,
+   grouping already-built widgets under a heading. No theming/visual
+   polish here; that's an explicit later phase. */
+
+.dashboard-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.dashboard-section__heading {
+  margin: 0;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+.dashboard-section__group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recognition-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.recognition-card {
+  flex: 1 1 160px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  border-radius: var(--radius-control);
+  padding: 0.75rem;
+  text-align: center;
+  animation: recognition-card-in var(--duration-celebratory) var(--ease-standard);
+}
+
+/*
+ * Fade + small upward lift only — deliberately no bounce or overshoot.
+ * This is the one animation in the app given a longer (celebratory)
+ * duration than everyday interaction feedback, but it uses the exact
+ * same easing curve as everything else. Motion communicates, never
+ * entertains: a Recognition win is still meant to feel calm in a
+ * classroom used for hours every day, not showy.
+ */
+@keyframes recognition-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recognition-card--full {
+  flex: none;
+  max-width: 22rem;
+  margin: 0 auto;
+  padding: 1.25rem;
+}
+
+.recognition-card__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.recognition-card__icon {
+  font-size: 1.5rem;
+}
+
+.recognition-card__label {
+  font-size: var(--text-xs);
+  color: var(--color-muted);
+  margin: 0.25rem 0;
+}
+
+.recognition-card__winners {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.recognition-card__winner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/*
+ * Phase 7B — Recognition design language. The avatar is deliberately
+ * the largest, most distinct shape in the whole app (a ring-bordered
+ * circle with a tinted accent fill) — nothing else uses this form, so
+ * Recognition reads as itself even in grayscale. In dark mode the ring
+ * becomes a soft glow rather than just a recolored border — a crisp
+ * ring reads as "light mode paper," a soft luminous edge reads as
+ * "dark mode screen." This is the one glow effect in the whole
+ * application, used nowhere else, so it stays meaningful.
+ */
+.recognition-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  /* Colorful, cycling per co-winner — "represent personality," not one
+     uniform blue for every student. First winner keeps the deep blue;
+     additional co-winners cycle through gold/pink for variety, matching
+     the same cycling pattern already used for Groups' huddle avatars. */
+  background-color: var(--color-primary-deep);
+  color: var(--color-on-primary-deep);
+  font-weight: var(--font-weight-bold);
+  font-size: 1rem;
+}
+
+[data-theme='dark'] .recognition-card__avatar {
+  border-color: transparent;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 0 12px 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.recognition-card--compact .recognition-card__avatar {
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.8rem;
+}
+.recognition-card__winner:nth-child(2) .recognition-card__avatar {
+  background-color: #8d6a16; /* darkened gold — verified 4.99:1 with white text */
+  color: #ffffff; /* fixed — this background doesn't change with the accent color choice, unlike the default (first) avatar */
+}
+.recognition-card__winner:nth-child(3) .recognition-card__avatar {
+  background-color: #a73e55; /* darkened pink — verified 6.06:1 with white text */
+  color: #ffffff;
+}
+/*
+ * The team-icon emoji (👥) has its own baked-in colors that CSS
+ * `color` can't change — a solid dark-blue fill left it with genuinely
+ * poor contrast against its own glyph colors. A light background lets
+ * the emoji's natural tones read clearly instead of fighting a dark
+ * fill, and doubles as a visual cue that this is a team, not a
+ * student.
+ */
+.recognition-card__avatar--team {
+  background-color: var(--color-bg);
+  color: initial;
+}
+
+.recognition-card__winner-name {
+  font-weight: var(--font-weight-black);
+  font-size: var(--text-lg);
+  /* Deep-blue tint, matching the avatar — "matching color text," not
+     black. Same formula already verified elsewhere in this app; a
+     white card background has even higher contrast headroom than the
+     gradient stops that formula was originally checked against. */
+  color: color-mix(in srgb, var(--color-primary) 25%, black);
+}
+
+.recognition-card--compact .recognition-card__winner-name {
+  font-size: var(--text-base);
+}
+
+.recognition-card__reason {
+  margin: 0.75rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.recognition-card__stat {
+  margin: 0.5rem 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-black);
+  color: color-mix(in srgb, var(--color-primary) 25%, black);
+}
+
+.recognition-card__period {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-muted);
+}
+
+/* Recognition Screen */
+
+.recognition-screen__period-tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 1.5rem 1rem;
+}
+
+.recognition-screen__category-chip--active {
+  /* Consumes the Celebrate palette's own accent (--color-accent) rather
+     than generic --color-primary — this screen is Recognition's home,
+     so its active state should carry Recognition's own identity, at
+     higher intensity than the Dashboard widget's lighter touch. */
+  border-color: var(--color-accent);
+  background-color: var(--color-accent);
+  color: var(--color-on-brand);
+}
+
+.recognition-screen__detail {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Leaderboard List */
+
+.leaderboard-list__rows {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.leaderboard-list__row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.4rem;
+  background-color: var(--color-bg);
+  border-radius: var(--radius-control);
+}
+.leaderboard-list__row:last-child {
+  margin-bottom: 0;
+}
+
+.leaderboard-list__rank {
+  font-weight: var(--font-weight-bold);
+  width: 2.5rem;
+}
+
+.leaderboard-list__name {
+  flex: 1;
+}
+
+.leaderboard-list__value {
+  font-weight: var(--font-weight-bold);
+}
+
+.leaderboard-list__toggle {
+  margin-top: 0.5rem;
+}
+
+/* Dashboard widget header row (heading + an optional action, e.g. "View All") */
+
+.dashboard-widget__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dashboard-widget__header-row .dashboard-widget__heading {
+  margin: 0;
+}
+
+/* Classroom Dashboard header (Phase 4) — Primary Action / Secondary
+   Content slots, in addition to the existing classroom context block.
+   Structural only, matching this whole feature's "no visual polish yet"
+   scope. */
+
+.classroom-header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.classroom-header__context {
+  flex: 1 1 100%;
+}
+
+/*
+ * The Hero — deliberately the single strongest visual treatment in the
+ * app. This is the one, explicitly scoped exception to this project's
+ * general "no gradients" convention (established in earlier phases for
+ * everyday UI chrome): a classroom's landing moment should feel like
+ * entering a room, not opening a tool, and a soft gradient is what
+ * creates that "this is a place, not a panel" feeling that flat color
+ * alone doesn't. Kept soft/pastel rather than saturated, so it reads as
+ * premium and welcoming rather than loud — consistent with "bright and
+ * breathable" everywhere else.
+ */
+.classroom-hero {
+  /* User's original gradient, darkened only enough for the large bold
+     title to clear WCAG's large-text exception (3:1, not the standard
+     4.5:1) — 80% mix, much closer to the original vibrant colors than
+     the earlier 65% fix. Verified: 5.49:1 / 3.3:1. The smaller
+     greeting/subtitle text (13.6px, doesn't qualify for the large-text
+     exception) sits below full AA at this level — flagged honestly,
+     not hidden; the text-shadow below is a real, separate technique to
+     help actual legibility, since it's not something the WCAG ratio
+     formula accounts for at all. */
+  background-color: var(--color-primary-deep); /* the chosen accent color — see config/accentColorConfig.js */
+  border-radius: var(--radius-card);
+  padding: 1.25rem 1.5rem;
+}
+.classroom-hero .tracker-header__title {
+  margin: 0;
+}
+.classroom-hero .tracker-header__title,
+.classroom-hero .tracker-header__subtitle,
+.classroom-hero__greeting,
+.classroom-hero__motto {
+  color: var(--color-on-primary-deep);
+  text-shadow: var(--shadow-on-primary-deep);
+}
+
+.classroom-header__primary-action {
+  flex: 0 0 auto;
+}
+
+.classroom-header__secondary-content {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+
+/*
+ * Phase 7B — actionable design language (Pending Tasks). Every row
+ * repeats the same affordance shape: a leading checkbox glyph, a
+ * trailing chevron — the row itself signals "tap to act" independent
+ * of its text, distinct from Recognition's avatar shelf or the
+ * editorial list's plain hairline rows.
+ */
+.checklist {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.checklist__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.checklist__row:last-child {
+  border-bottom: none;
+}
+.checklist__row:hover {
+  background-color: var(--palette-focus-wash);
+}
+.checklist__row:hover .checklist__box {
+  border-color: color-mix(in srgb, var(--color-warning) 70%, black);
+  background-color: color-mix(in srgb, var(--color-warning) 70%, black);
+}
+.checklist__row:hover .checklist__chevron {
+  color: var(--palette-focus-label);
+}
+/*
+ * "Graphics and icons, not checkboxes and bare emoji" — the row
+ * indicator is a CSS-drawn ring (a real graphic element), not a
+ * Unicode checkbox character; the group heading's emoji sits inside a
+ * colored circular badge rather than floating bare in the text.
+ */
+.checklist__box {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid color-mix(in srgb, var(--color-warning) 70%, black);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/*
+ * Pending Tasks: collapsed by default behind one toggle, rather than
+ * every item's row always visible — "make this neater by just showing
+ * an expandable button." A compact summary line replaces the always-
+ * visible detail rows until the teacher chooses to expand.
+ */
+.task-summary-line {
+  color: var(--color-muted);
+}
+.task-detail-toggle {
+  margin-bottom: 0.5rem;
+}
+.task-detail-container--collapsed {
+  display: none;
+}
+
+.task-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.task-group-heading__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  background-color: color-mix(in srgb, var(--color-warning) 18%, var(--color-surface));
+  font-size: 0.9rem;
+}
+.checklist__label {
+  flex: 1;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.checklist__label--button {
+  font-family: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.checklist__label--button:hover {
+  color: var(--color-primary);
+}
+.checklist__chevron {
+  color: var(--color-muted);
+  font-size: 1.1rem;
+}
+
+/* Pending Task resolution — success indication + height collapse
+   combined, so a task disappearing never causes an abrupt layout jump.
+   See ui/components/PendingTasksWidget.js for how "just resolved" is
+   detected. */
+.dashboard-widget__resolved-list {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+.dashboard-widget__resolved-item {
+  overflow: hidden;
+  max-height: 2rem;
+  opacity: 1;
+  padding: 0.25rem 0;
+  color: var(--color-success);
+  font-weight: var(--font-weight-medium);
+  transition: max-height var(--duration-base) var(--ease-standard), opacity var(--duration-base) var(--ease-standard),
+    padding var(--duration-base) var(--ease-standard);
+}
+.dashboard-widget__resolved-item--collapsing {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/*
+ * ---------------------------------------------------------------------
+ * Student Portal — deliberately its own visual register, not a themed
+ * copy of Classroom Tracker's admin-dashboard chrome. Per the stated
+ * product philosophy ("encouraging, personal, motivating... avoid
+ * admin dashboards and teacher terminology"), nothing below reuses
+ * .tracker-header, .dashboard-widget, or any of Classroom Tracker's
+ * palette tokens directly — nothing here should look like the same
+ * app wearing a different hat. Self-contained block; if this needs to
+ * change, Classroom Tracker's styling is unaffected, and vice versa.
+ * ---------------------------------------------------------------------
+ */
+
+.student-portal {
+  min-height: 100vh;
+  background-color: #fef9f3;
+}
+
+.student-portal__topbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.5rem 0;
+}
+.student-portal__back-link {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+}
+.student-portal__back-link:hover {
+  color: var(--color-primary);
+}
+
+.student-portal__nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.5rem 1rem;
+  flex-wrap: wrap;
+}
+.student-portal__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 0.5rem 1.1rem;
+  cursor: pointer;
+  color: var(--color-muted);
+  font-family: inherit;
+}
+.student-portal__tab-icon {
+  font-size: 1.3rem;
+}
+.student-portal__tab-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+}
+.student-portal__tab--active {
+  background-color: #fff0dc;
+  color: #b8631a;
+}
+
+.student-portal__content {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 3rem;
+}
+
+.student-section__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1rem;
+}
+
+/* Home */
+.student-home__greeting {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1.25rem;
+  text-align: center;
+}
+.student-home__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.student-home__card {
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 1.5rem;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-home__card-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+.student-home__card-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.student-home__card-value {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 0.2rem;
+  color: #b8631a;
+}
+.student-home__card-caption {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0;
+}
+
+/* Achievements */
+.student-achievements__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.student-achievements__item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-achievements__item-icon {
+  font-size: 1.75rem;
+}
+.student-achievements__item-label {
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+.student-achievements__item-meta {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0.15rem 0 0;
+}
+
+/* Team */
+.student-team__stars {
+  font-size: 1.1rem;
+  color: var(--color-muted);
+  margin: 0 0 1.25rem;
+}
+.student-team__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.student-team__row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 0.85rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-team__row-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: var(--font-weight-bold);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.student-team__row-name {
+  font-weight: var(--font-weight-medium);
+}
+
+/* Learn (placeholder) */
+.student-learn-placeholder {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.student-learn-placeholder__icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 1rem;
+}
+.student-learn-placeholder__subtitle {
+  color: var(--color-muted);
+  font-size: 1.1rem;
+}
+
+/* Profile */
+.student-profile {
+  text-align: center;
+}
+.student-profile__avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 2.2rem;
+  font-weight: var(--font-weight-black);
+}
+.student-profile__name {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0 0 1.5rem;
+}
+.student-profile__details {
+  max-width: 320px;
+  margin: 0 auto;
+  text-align: left;
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+}
+.student-profile__detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f3e8dc;
+}
+.student-profile__detail-row:last-child {
+  border-bottom: none;
+}
+.student-profile__detail-label {
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+}
+.student-profile__detail-value {
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+
+/* First-visit Classroom ID entry screen */
+.student-join-code {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 0.85rem;
+}
+.student-join-code__icon {
+  font-size: 3rem;
+}
+.student-join-code__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+.student-join-code__subtitle {
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+}
+.student-join-code__input {
+  width: 100%;
+  font-family: 'Courier New', monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+.student-join-code__error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.student-profile__join-another {
+  margin-top: 1.5rem;
+}
+
+/* Session Review — shown on "End Class" */
+.session-review {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  gap: 0.5rem;
+}
+.session-review__title {
+  font-size: 1.75rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+  text-align: center;
+}
+.session-review__subtitle {
+  color: var(--color-muted);
+  text-align: center;
+  margin: 0 0 1.5rem;
+}
+.session-review__stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+}
+.session-review__stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 1.1rem 1rem;
+  text-align: center;
+}
+.session-review__stat-icon {
+  font-size: 1.5rem;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.session-review__stat-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.25rem;
+}
+.session-review__stat-value {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-black);
+  margin: 0;
+}
+.session-review__empty-note {
+  text-align: center;
+  color: var(--color-muted);
+  font-style: italic;
+  margin: 0.75rem 0 0;
+}
+.session-review__section-title {
+  font-size: 1rem;
+  font-weight: var(--font-weight-black);
+  margin: 1.5rem 0 0.75rem;
+}
+.session-review__top-contributors {
+  display: flex;
+  flex-direction: column;
+}
+.session-review__contributor-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.session-review__contributor-row:last-child {
+  border-bottom: none;
+}
+.session-review__contributor-medal {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.session-review__contributor-name {
+  font-weight: var(--font-weight-bold);
+  margin: 0;
+}
+.session-review__contributor-count {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin: 0.1rem 0 0;
+}
+.session-review__divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 1.5rem 0;
+}
+.session-review__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Unsaved-changes indicator — visible but unobtrusive, next to the Class Mode title */
+.tracker-header__draft-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-primary-deep);
+  opacity: 0.85;
+  margin-top: 0.2rem;
+}
+.tracker-header__draft-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+/* "Who's learning today?" student picker */
+.student-picker {
+  max-width: 420px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  gap: 1.25rem;
+}
+.student-picker__title {
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-black);
+  text-align: center;
+  margin: 0;
+}
+.student-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+.student-picker__card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: #ffffff;
+  border: none;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(184, 99, 26, 0.08);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.student-picker__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: var(--font-weight-black);
+  flex-shrink: 0;
+}
+.student-picker__name {
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-bold);
+}

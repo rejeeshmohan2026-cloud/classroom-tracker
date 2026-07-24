@@ -2,12 +2,19 @@
  * utils/validators.js
  *
  * Small, dependency-free input validation helpers used across services
- * and (later) the UI layer.
- *
- * Not implemented yet. Expected responsibilities:
- *   - isNonEmptyString(value)
- *   - isValidObservationCategory(value)
- *   - isValidDateString(value)
+ * and the UI layer.
  */
 
-// Intentionally left unimplemented for this milestone.
+import { ACTION_TYPES } from '../config/actionTypes.js';
+
+export function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function isValidEventType(type) {
+  return Object.values(ACTION_TYPES).includes(type);
+}
+
+export function isValidDateString(value) {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+}

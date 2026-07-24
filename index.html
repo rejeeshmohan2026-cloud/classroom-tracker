@@ -1,11 +1,32 @@
 <!DOCTYPE html>
+<!--
+  Product architecture refactor: the app is now a router-driven shell.
+  There's no static header or team-cards markup here anymore — every
+  screen (Welcome, Home, Tracker, Settings) is rendered into #app by
+  main.js based on the current route (see ui/router.js). See
+  docs/problem-statement.md and README.md for the full picture.
+
+  Sprint 4: Google Authentication (Firebase Auth) sits in front of all
+  of that. #user-bar is a small persistent strip (avatar/name/Sign Out)
+  shown above #app once a teacher is signed in — see
+  services/authService.js and ui/components/UserBar.js. If no one is
+  signed in, #app shows ui/views/LoginView.js instead of the router.
+-->
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0; url=src/index.html">
-  <title>Redirecting...</title>
-</head>
-<body>
-  <p>Redirecting to Classroom Tracker...</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Classroom Tracker</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div id="user-bar"></div>
+    <div id="app"></div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
 </html>

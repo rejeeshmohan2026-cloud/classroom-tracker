@@ -29,7 +29,7 @@ project is organised and how to contribute changes cleanly.
   religion data, or photos/videos of students — in code, comments, sample
   data, or test fixtures. If a feature seems to require this kind of data,
   escalate to the AI Working Committee before implementing it.
-- **Never commit real credentials.** `src/js/config/firebaseConfig.js`
+- **Never commit real credentials.** `js/config/firebaseConfig.js`
   holds live Firebase project credentials and is gitignored — treat it
   like a `.env` file. Never overwrite it with placeholder values, never
   regenerate it, and never include it in an exported/shared copy of the
@@ -68,7 +68,7 @@ locally.
 
 ## Adding a New File
 
-When adding a new file to `src/js/`, place it in the layer it belongs to
+When adding a new file to `js/`, place it in the layer it belongs to
 (`models/`, `services/`, `storage/`, `ui/`, `utils/`, or `config/`) and add
 a short header comment describing its purpose, following the style already
 used in the placeholder files.

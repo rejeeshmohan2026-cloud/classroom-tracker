@@ -1437,3 +1437,39 @@ Confirmed end-to-end with real browser navigation (not just service-level calls)
 ### Future TODOs
 - Production `GoogleIdentityProvider` and a real `ConsentProvider` (disclosure + affirmative parent/guardian confirmation + stored consent record) — both remain gated behind the same compliance review described in the Student Portal Foundation entry above.
 - (Carried over, unchanged): note-undo gap in `classModeService`; Session Lock and Session History from the Class Mode UX phase; consolidate avatar implementations; `firestore.rules` review; Learning Hub; role-based routing; all previously-listed items.
+
+---
+
+## Repository Restructure: `src/` Contents Moved to Repository Root
+
+**Context:** direct question about whether `src/` or the repository root should be the canonical source. Investigated the actual constraint rather than answering abstractly: GitHub Pages only publishes from a repository's root or a `/docs` folder, not an arbitrary path like `/src` — meaning this repository, as structured, was not actually deployable to GitHub Pages regardless of which philosophy was preferred. Recommended moving the app to root over either a redirect page or renaming `src/` to `docs/` (which would have collided with the existing `docs/` folder already used for project documentation) — root avoids both a permanent indirection file and any naming collision.
+
+### What Moved
+`src/index.html`, `src/css/`, `src/js/`, `src/data/` all moved to the repository root, unchanged in content and internal structure — only their parent location changed. `index.html`'s own asset references (`css/styles.css`, `js/main.js`) were already relative paths, so they needed no edits at all; they continue to resolve correctly now that `css/` and `js/` are still direct siblings of `index.html`, just one level up.
+
+### A Real, Easy-to-Miss Fix Caught During the Sweep
+`.gitignore`'s entry for the real (never-committed) Firebase credentials file still read `src/js/config/firebaseConfig.js` — a stale path here wouldn't have caused a visible error anywhere, it would have silently stopped protecting the actual credentials file at its new location, `js/config/firebaseConfig.js`, from ever being accidentally committed. Fixed as part of this migration, not left for someone to discover only after it mattered.
+
+### Every Reference Swept and Resolved
+Searched the entire repository (HTML, CSS, JavaScript, JSON, Firestore rules, and every Markdown file) for the literal string `src/`. Confirmed no manifest or service worker files exist anywhere in this project. Fixed every genuine stale reference found:
+- `README.md` — the project structure diagram's `src/` wrapper removed (files de-indented one level, tree connectors adjusted accordingly); both `firebaseConfig.js` path references fixed; the "serve locally" instructions updated to run from root (no more `cd src`), with explicit Live Server guidance added; a new "GitHub Pages deployment" section added, since this migration's entire purpose was making that possible and the README never mentioned deployment at all before now.
+- `CONTRIBUTING.md` — both `src/js/...` references fixed (the credentials-file warning, and the "adding a new file" guidance).
+- `tests/README.md` — the suggested test-mirroring path fixed.
+- `js/config/firebaseConfig.example.js` — its own header comment's self-reference fixed.
+- `.gitignore` — see above.
+
+**`CHANGELOG.md`'s own extensive historical references to `src/js/...` and `src/css/...` were deliberately left untouched.** Those entries are an accurate record of what was true *at the time each change was made* — every one of them correctly describes a file that genuinely lived under `src/` when that entry was written. Rewriting them to reflect the post-migration path would make the changelog historically inaccurate, not more correct; this entry exists precisely to document the one point in time where that path changed, rather than retroactively erasing the fact that it ever existed.
+
+### Regression Verification
+Tested by serving the actual migrated repository root as a static site (not a simulated environment) and exercising every route category: the Landing page and bare root (`/`, with no `index.html` suffix — the same way GitHub Pages and Live Server actually serve a site), the Teacher flow end-to-end (sign-in, classroom creation, Settings, multi-segment routes like Notebook Register's subject/type/date and Recognition Screen's period/category), Class Mode through a full Session Review → Save cycle, and the Student Portal's identity flow (sign-in, PIN linking, and — via a genuine full page reload from the new root — that linking is still remembered correctly). Separately confirmed zero failed local asset requests across a full page load and navigation (the only failed request was the external Google Fonts CDN, expected and unrelated to this migration, since this sandboxed environment has no internet access).
+
+### Files Changed
+- Moved: `index.html`, `css/*`, `js/**/*`, `data/*` (from `src/` to repository root — contents unchanged, only location).
+- Modified: `.gitignore`, `README.md`, `CONTRIBUTING.md`, `tests/README.md`, `js/config/firebaseConfig.example.js`.
+- Removed: the now-empty `src/` directory.
+
+### Breaking Changes
+None to application behavior — every route, service, and component works identically to before, confirmed by the regression pass above. The only externally-visible change is that local development and any future GitHub Pages configuration now point at the repository root instead of `/src`.
+
+### Future TODOs
+- (Carried over, unchanged): note-undo gap in `classModeService`; Session Lock and Session History from the Class Mode UX phase; production `GoogleIdentityProvider`/`ConsentProvider` pending AI Working Committee review; consolidate avatar implementations; `firestore.rules` review; Learning Hub; role-based routing; all previously-listed items.

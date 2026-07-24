@@ -1,0 +1,42 @@
+{
+  "_comment": "Sample/fixture data only — entirely fictional, for local development and future testing. Not real classroom, student, or Fellow data. Do not add real student information here; see docs/problem-statement.md for data-handling rules.",
+  "classroom": {
+    "id": "sample-classroom-1",
+    "name": "Grade 5 - Section B",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  "students": [
+    {
+      "id": "sample-student-1",
+      "name": "Sample Student A",
+      "classroomId": "sample-classroom-1",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "sample-student-2",
+      "name": "Sample Student B",
+      "classroomId": "sample-classroom-1",
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "sample-event-1",
+      "type": "academic",
+      "studentId": "sample-student-1",
+      "classroomId": "sample-classroom-1",
+      "note": "Sample note describing an academic milestone.",
+      "score": null,
+      "recordedAt": "2026-01-05T00:00:00.000Z"
+    },
+    {
+      "id": "sample-event-2",
+      "type": "behavioural",
+      "studentId": "sample-student-2",
+      "classroomId": "sample-classroom-1",
+      "note": "Sample note describing a behavioural observation.",
+      "score": null,
+      "recordedAt": "2026-01-06T00:00:00.000Z"
+    }
+  ]
+}

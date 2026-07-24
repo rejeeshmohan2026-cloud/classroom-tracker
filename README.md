@@ -31,46 +31,45 @@ classroom-tracker/
 │   ├── icons/                 # Icon assets (not added yet)
 │   └── images/                # Static image assets (not added yet)
 │
-└── src/
-    ├── index.html              # Application entry point (placeholder)
+├── index.html              # Application entry point (placeholder)
+│
+├── css/
+│   └── styles.css          # Global stylesheet (placeholder — UI not built yet)
+│
+├── data/
+│   └── sample-classroom.json  # Fictional fixture data for local dev/testing
+│
+└── js/
+    ├── main.js             # Application bootstrap / entry script
     │
-    ├── css/
-    │   └── styles.css          # Global stylesheet (placeholder — UI not built yet)
+    ├── config/             # Centralised configuration and vocabulary
+    │   ├── actionTypes.js      # The fixed set of Event types (the action vocabulary)
+    │   ├── scoringConfig.js    # How Event types map to derived scores/weights
+    │   └── appConfig.js        # General app-wide settings (storage keys, locale, etc.)
     │
-    ├── data/
-    │   └── sample-classroom.json  # Fictional fixture data for local dev/testing
+    ├── models/             # Plain data structures describing core concepts
+    │   ├── Student.js          # Student record shape
+    │   ├── Classroom.js        # Classroom / cohort record shape
+    │   └── Event.js            # Event record shape — the core unit of the event log
     │
-    └── js/
-        ├── main.js             # Application bootstrap / entry script
-        │
-        ├── config/             # Centralised configuration and vocabulary
-        │   ├── actionTypes.js      # The fixed set of Event types (the action vocabulary)
-        │   ├── scoringConfig.js    # How Event types map to derived scores/weights
-        │   └── appConfig.js        # General app-wide settings (storage keys, locale, etc.)
-        │
-        ├── models/             # Plain data structures describing core concepts
-        │   ├── Student.js          # Student record shape
-        │   ├── Classroom.js        # Classroom / cohort record shape
-        │   └── Event.js            # Event record shape — the core unit of the event log
-        │
-        ├── services/           # Business logic that operates on models
-        │   ├── classroomService.js    # Classroom-level operations (create, update, list)
-        │   ├── studentService.js      # Student-level operations
-        │   └── eventService.js        # Recording and querying Events
-        │
-        ├── storage/             # Persistence layer (swappable backend)
-        │   ├── storageAdapter.js      # Interface/contract all storage adapters follow
-        │   └── localStorageAdapter.js # Browser localStorage implementation
-        │
-        ├── ui/                  # Rendering and DOM-facing code (not built yet)
-        │   ├── components/
-        │   │   └── README.md        # Notes on planned UI components
-        │   └── renderer.js          # Placeholder for DOM rendering logic
-        │
-        └── utils/               # Small, dependency-free helper functions
-            ├── validators.js        # Input validation helpers
-            ├── dateHelpers.js       # Date formatting/parsing helpers
-            └── idGenerator.js       # Unique ID generation helper
+    ├── services/           # Business logic that operates on models
+    │   ├── classroomService.js    # Classroom-level operations (create, update, list)
+    │   ├── studentService.js      # Student-level operations
+    │   └── eventService.js        # Recording and querying Events
+    │
+    ├── storage/             # Persistence layer (swappable backend)
+    │   ├── storageAdapter.js      # Interface/contract all storage adapters follow
+    │   └── localStorageAdapter.js # Browser localStorage implementation
+    │
+    ├── ui/                  # Rendering and DOM-facing code (not built yet)
+    │   ├── components/
+    │   │   └── README.md        # Notes on planned UI components
+    │   └── renderer.js          # Placeholder for DOM rendering logic
+    │
+    └── utils/               # Small, dependency-free helper functions
+        ├── validators.js        # Input validation helpers
+        ├── dateHelpers.js       # Date formatting/parsing helpers
+        └── idGenerator.js       # Unique ID generation helper
 ```
 
 ### Why this structure?
@@ -136,11 +135,11 @@ cd classroom-tracker
 ### 2. Set up Firebase (Authentication + Firestore)
 
 The app won't sign anyone in or load any classrooms until this is done.
-`src/js/config/firebaseConfig.js` holds your **real** Firebase
+`js/config/firebaseConfig.js` holds your **real** Firebase
 credentials — it's gitignored and is never committed, regenerated, or
 included in any generated project archive, the same way you'd treat a
 `.env` file. See
-[`src/js/config/firebaseConfig.example.js`](src/js/config/firebaseConfig.example.js)
+[`js/config/firebaseConfig.example.js`](js/config/firebaseConfig.example.js)
 for the full checklist and every field's placeholder:
 
 1. Copy `firebaseConfig.example.js` to `firebaseConfig.js` in the same
@@ -162,20 +161,31 @@ for the full checklist and every field's placeholder:
 
 ### 3. Serve the project locally
 
-Any static file server works. For example, using Python:
+Any static file server works, run from the repository root. For example, using Python:
 
 ```bash
-cd src
 python3 -m http.server 8000
 ```
 
 Or using Node's `http-server` (if installed globally):
 
 ```bash
-npx http-server src -p 8000
+npx http-server . -p 8000
 ```
 
+Or with VS Code's Live Server extension, right-click `index.html` at
+the repository root and choose "Open with Live Server."
+
 Then open `http://localhost:8000` in your browser.
+
+### GitHub Pages deployment
+
+The app lives at the repository root specifically so GitHub Pages can
+serve it directly — Pages only publishes from a repository's root or a
+`/docs` folder, not an arbitrary path. In the repository's Settings →
+Pages, set the source to the branch you want published, with root
+(`/`) as the folder. No build step is required; every file Pages needs
+(`index.html`, `css/`, `js/`, `data/`) is already at the root.
 
 ### 4. Formatting
 
