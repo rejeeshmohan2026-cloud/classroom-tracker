@@ -150,4 +150,10 @@ export class ClassroomRepository {
   async addSelfAsTeacher(classroomId, uid, memberInfo) {
     throw new Error('ClassroomRepository.addSelfAsTeacher() must be implemented by a subclass');
   }
+
+  /** A one-time read of a classroom document — used by services/classSessionService.js's discardSession(), to throw away in-memory-only draft mutations by re-fetching the last-saved server state. Not a subscription. */
+  // eslint-disable-next-line no-unused-vars
+  async getClassroomOnce(classroomId) {
+    throw new Error('ClassroomRepository.getClassroomOnce() must be implemented by a subclass');
+  }
 }

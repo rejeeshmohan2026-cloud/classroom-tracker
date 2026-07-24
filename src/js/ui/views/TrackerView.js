@@ -5,12 +5,20 @@
  * lesson. Tap a student to award a star, swipe left to deduct a point,
  * press and hold for Quick Actions (Award Badge / Add Note / Change
  * Bucket / Open Full Profile) — see ClassModeStudentRow.js and
- * QuickActionsSheet.js. Every action saves immediately, shows a subtle
- * toast, and re-renders in place (no navigation, no modal for the
- * routine actions). Undo reverses the single most recent action of any
- * kind (see services/classModeService.js); Reset Session zeroes every
- * student's score for a fresh lesson without touching their permanent
- * profile data (badges, notes, bucket, lifetime history).
+ * QuickActionsSheet.js.
+ *
+ * Class Session model: every action still mutates the in-memory
+ * classroom object immediately (so the UI stays live), but NOTHING is
+ * written to Firestore per-action anymore — see
+ * services/classSessionService.js. A session starts automatically the
+ * first time this view renders for a classroom; "End Class" shows a
+ * Session Review screen (counts of what happened this session), and
+ * only "Save Session" there performs the one, single permanent write.
+ * "Discard Session" throws every draft change away by re-fetching the
+ * classroom from Firestore. Undo still reverses the single most recent
+ * action of any kind (see services/classModeService.js) — it no
+ * longer triggers its own save, since nothing is saved until the
+ * session ends.
  */
 
 import { createTeamCardElement } from '../components/TeamCard.js';
@@ -19,11 +27,12 @@ import { openQuickActionsSheet } from '../components/QuickActionsSheet.js';
 import { openAwardBadgeModal } from '../components/AwardBadgeModal.js';
 import { openAddNoteModal } from '../components/AddNoteModal.js';
 import { showToast } from '../components/Toast.js';
-import * as workspaceService from '../../services/workspaceService.js';
+import { renderSessionReview } from '../components/SessionReview.js';
 import * as studentService from '../../services/studentService.js';
 import * as badgeService from '../../services/badgeService.js';
 import * as noteService from '../../services/noteService.js';
 import * as classModeService from '../../services/classModeService.js';
+import * as classSessionService from '../../services/classSessionService.js';
 import { getTeamScore } from '../../services/teamService.js';
 import { getDisplayName, getDisplaySubtitle } from '../../services/classroomService.js';
 
@@ -31,11 +40,33 @@ export function renderTrackerView(container, props) {
   const { classroom, onBack, onSettings, onActivities, onNotebooks, onSelectStudent } = props;
   const highlight = props._highlight || {};
 
+  if (!classSessionService.isSessionActive(classroom)) {
+    classSessionService.startSession(classroom);
+  }
+
   container.innerHTML = '';
 
   const rerender = (nextHighlight) => {
     renderTrackerView(container, { ...props, _highlight: nextHighlight || {} });
   };
+
+  if (props._showSessionReview) {
+    renderSessionReview(container, {
+      classroom,
+      onContinueTeaching: () => renderTrackerView(container, { ...props, _showSessionReview: false }),
+      onSaveSession: () => {
+        classSessionService.commitSession(classroom);
+        showToast('Session saved');
+        renderTrackerView(container, { ...props, _showSessionReview: false });
+      },
+      onDiscardSession: async () => {
+        await classSessionService.discardSession(classroom);
+        showToast('Session discarded — nothing was saved');
+        onBack();
+      },
+    });
+    return;
+  }
 
   const wrapper = document.createElement('div');
   wrapper.className = 'tracker-view';
@@ -47,7 +78,17 @@ export function renderTrackerView(container, props) {
   backButton.type = 'button';
   backButton.className = 'btn btn--text';
   backButton.textContent = '← Back';
-  backButton.addEventListener('click', onBack);
+  backButton.addEventListener('click', async () => {
+    const { totalActions } = classSessionService.getSessionSummary(classroom);
+    if (totalActions > 0) {
+      const confirmed = window.confirm(
+        `This session has ${totalActions} unsaved change${totalActions === 1 ? '' : 's'}. Leaving now without ending class will discard ${totalActions === 1 ? 'it' : 'them'}. Leave anyway?`
+      );
+      if (!confirmed) return;
+      await classSessionService.discardSession(classroom);
+    }
+    onBack();
+  });
 
   const titleBlock = document.createElement('div');
   titleBlock.className = 'tracker-header__title-block';
@@ -80,7 +121,6 @@ export function renderTrackerView(container, props) {
   undoButton.addEventListener('click', () => {
     const undone = classModeService.undo(classroom);
     if (undone) {
-      workspaceService.save(classroom);
       showToast('Last action undone');
       rerender();
     }
@@ -100,7 +140,6 @@ export function renderTrackerView(container, props) {
     if (!confirmed) return;
     studentService.resetAllScores(classroom);
     classModeService.clearUndoStack(classroom);
-    workspaceService.save(classroom);
     showToast('Session reset');
     rerender();
   });
@@ -129,7 +168,15 @@ export function renderTrackerView(container, props) {
   notebooksButton.title = 'Notebook Tracker';
   notebooksButton.addEventListener('click', onNotebooks);
 
-  actions.append(undoButton, resetButton, activitiesButton, notebooksButton, settingsButton);
+  const endClassButton = document.createElement('button');
+  endClassButton.type = 'button';
+  endClassButton.className = 'btn btn--primary';
+  endClassButton.textContent = 'End Class';
+  endClassButton.addEventListener('click', () => {
+    renderTrackerView(container, { ...props, _showSessionReview: true });
+  });
+
+  actions.append(undoButton, resetButton, activitiesButton, notebooksButton, settingsButton, endClassButton);
   header.append(backButton, titleBlock, actions);
 
   const grid = document.createElement('section');
@@ -166,14 +213,14 @@ export function renderTrackerView(container, props) {
 
 function handleTap(classroom, team, student, rerender) {
   classModeService.awardStar(classroom, student);
-  workspaceService.save(classroom);
+  classSessionService.recordAction(classroom, 'star');
   showToast(`+1 Star awarded to ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
 
 function handleSwipeLeft(classroom, team, student, rerender) {
   classModeService.deductPoint(classroom, student);
-  workspaceService.save(classroom);
+  classSessionService.recordAction(classroom, 'behaviour');
   showToast(`-1 Negative recorded for ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
@@ -190,7 +237,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
         onAwardExisting: (badgeName) => {
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            workspaceService.save(classroom);
+            classSessionService.recordAction(classroom, 'badge');
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }
@@ -199,7 +246,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
           badgeService.addBadgeToCatalog(classroom, badgeName);
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            workspaceService.save(classroom);
+            classSessionService.recordAction(classroom, 'badge');
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }
@@ -210,7 +257,6 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
       openAddNoteModal({
         onSave: ({ teacherName, content }) => {
           noteService.addNote(student, { teacherName, content });
-          workspaceService.save(classroom);
           showToast('Note added');
           rerender();
         },
@@ -219,7 +265,6 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
     onChangeBucket: (bucketKey) => {
       const entry = classModeService.changeBucketQuick(classroom, student, bucketKey);
       if (entry) {
-        workspaceService.save(classroom);
         showToast(`Bucket changed for ${student.name}`);
         rerender();
       }

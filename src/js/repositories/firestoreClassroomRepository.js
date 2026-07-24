@@ -174,6 +174,11 @@ class FirestoreClassroomRepository extends ClassroomRepository {
     await setDoc(this._classroomDoc(classroom.id), classroom);
   }
 
+  async getClassroomOnce(classroomId) {
+    const docSnapshot = await getDoc(this._classroomDoc(classroomId));
+    return docSnapshot.exists() ? docSnapshot.data() : null;
+  }
+
   async deleteClassroom(classroomId, memberUids = []) {
     const batch = writeBatch(this._getDb());
     batch.delete(this._classroomDoc(classroomId));

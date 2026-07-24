@@ -15,6 +15,7 @@
  */
 
 import * as workspaceService from '../../services/workspaceService.js';
+import * as classSessionService from '../../services/classSessionService.js';
 import * as notebookConfigService from '../../services/notebookConfigService.js';
 import * as notebookService from '../../services/notebookService.js';
 import { createNotebookRosterElement } from '../components/NotebookRoster.js';
@@ -23,6 +24,24 @@ import { getTodayDateKey, shiftDateKey, formatDateKey } from '../../utils/dateHe
 import { createDebouncedFunction } from '../../utils/debounce.js';
 
 const debouncedSave = createDebouncedFunction((classroom) => workspaceService.save(classroom), 400);
+
+/**
+ * Notebook updates are one of the four draft categories in the Class
+ * Session model (see services/classSessionService.js) — if a session
+ * is active (this Register was reached mid-lesson, e.g. via Class
+ * Mode's header button), a status change becomes a draft, recorded for
+ * the Session Review count, with no immediate write. Outside of an
+ * active session (marking notebooks independently, not mid-lesson),
+ * behavior is unchanged: the existing debounced auto-save still
+ * applies immediately, exactly as before this feature existed.
+ */
+function saveOrRecordDraft(classroom) {
+  if (classSessionService.isSessionActive(classroom)) {
+    classSessionService.recordAction(classroom, 'notebook');
+  } else {
+    debouncedSave(classroom);
+  }
+}
 
 export function renderNotebookRegisterView(container, props) {
   const { classroom, subjectId, notebookTypeId, currentUser, onBack, onNavigateDate, onOpenTimeline } = props;
@@ -124,12 +143,12 @@ export function renderNotebookRegisterView(container, props) {
         getEntryForStudent: (studentId) => notebookService.getEntry(classroom, subjectId, notebookTypeId, dateKey, studentId),
         onSetSubmission: (studentId, value) => {
           notebookService.setEntry(classroom, subjectId, notebookTypeId, dateKey, studentId, { submission: value }, actingUid);
-          debouncedSave(classroom);
+          saveOrRecordDraft(classroom);
           rerender();
         },
         onSetCompletion: (studentId, value) => {
           notebookService.setEntry(classroom, subjectId, notebookTypeId, dateKey, studentId, { completion: value }, actingUid);
-          debouncedSave(classroom);
+          saveOrRecordDraft(classroom);
           rerender();
         },
       })

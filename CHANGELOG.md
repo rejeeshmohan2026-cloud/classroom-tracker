@@ -1281,3 +1281,54 @@ Confirmed via a real, full page reload (not just in-app navigation) that a joine
 
 ### Future TODOs
 - (Carried over, unchanged): Wire the Student Portal to real student data, pending the AI Working Committee review; consolidate Classroom Tracker's three ad-hoc avatar implementations onto the shared generator; have the proposed `firestore.rules` changes reviewed; real Student Portal authentication; Learning Hub; role-based routing; all previously-listed items.
+
+---
+
+## Class Session Architecture — Draft-Until-Save for Class Mode
+
+**Context:** an architectural change to how Class Mode persists data, requested with an explicit "review first, explain, then implement" — reported symptom: accidental clicks were becoming permanent history, and undoing still left traces, because every interaction wrote to Firestore immediately.
+
+### What was found in the current implementation, before any code was written
+Traced every write path directly rather than assuming: `handleTap`, `handleSwipeLeft`, badge award (both paths), and bucket change in `TrackerView.js` each called `workspaceService.save(classroom)` immediately after mutating in-memory state — and critically, **so did `classModeService.undo()`'s caller**. This is the literal mechanism behind the reported bug: an accidental tap and its undo were two *separate* Firestore writes, with a real window between them where the mistake was live on the server, observable by anything else subscribed to that classroom, before the undo's write caught up. `NotebookRegisterView.js` had the same shape (400ms-debounced auto-save, no session concept). Also found: `noteService.addNote()` has no undo wired into `classModeService`'s stack at all — an existing, separate gap, named explicitly rather than silently folded into this work or silently left unmentioned.
+
+### Architecture
+- **`services/classSessionService.js`** (new) — a Class Session is in-memory only, per classroom, exactly like `classModeService`'s existing (already in-memory) undo stack sits alongside it. A session holds a simple action log (`{ type, at }`) used only for the Session Review's counts — it does not duplicate what the undo stack already tracks for reversal. Two terminal operations:
+  - **`commitSession()`** — the single permanent write. Calls `workspaceService.save()` exactly once, then clears the undo stack and the session log.
+  - **`discardSession()`** — re-fetches the classroom from Firestore (`getClassroomOnce()`, new) and overwrites the in-memory copy, throwing away every draft mutation at once. Chosen over trying to reverse each drafted action individually: since nothing was ever written, the server's copy is already correct — re-fetching it is simpler and can't drift from whatever the undo stack did or didn't track.
+- **Every per-action `workspaceService.save()` call removed from `TrackerView.js`** — award star, deduct point, badge award (both paths), bucket change all still mutate in-memory state exactly as before (so the UI stays live), but now call `classSessionService.recordAction()` instead of saving. This directly satisfies "refactor so all permanent writes happen through a single session commit mechanism": previously 6 different call sites wrote to Firestore; now exactly one function does.
+- **Undo no longer triggers a save** — since nothing is written until the session ends, there's no longer a race between an action's write and its undo's write to worry about; undo purely reverses in-memory state, exactly as `classModeService.undo()` already did.
+- **`ui/components/SessionReview.js`** (new) — the screen shown by a new "End Class" button in Class Mode's header, matching the spec's exact layout (Stars Awarded / Behaviour Notes / Notebook Updates / Recognitions, then Continue Teaching / Save Session / Discard Session). Counts come from the session's in-memory action log, not Firestore.
+- **`NotebookRegisterView.js`** — status changes now check `classSessionService.isSessionActive()`. If a session is active (Register reached mid-lesson via Class Mode's header), a change becomes a draft (recorded, no write). Outside an active session (marking notebooks independently, not mid-lesson), the existing immediate debounced auto-save is completely unchanged — confirmed via testing, not assumed.
+- **Leaving Class Mode mid-session (the header's Back button) now warns first** if there are unsaved draft actions, and — if the teacher confirms leaving anyway — actually calls `discardSession()` rather than just navigating away. Without this, the shared in-memory classroom object (used by every other view, including the Dashboard) would keep showing unsaved draft state as if it had been saved, which would be actively misleading.
+
+### How existing reports and history continue working
+Unchanged, by design: the data shape written on commit (`student.history`, `student.score`, `student.badges`, notebook entries) is byte-for-byte identical to what immediate-write mode used to produce. Recognition Wall, streaks, and Weekly Snapshot read that data the same way regardless of whether it arrived via the old per-action write path or the new single-commit path — only *when* the write happens changed, never *what* gets written.
+
+### A real bug caught mid-implementation, not assumed away
+A scripted find-and-replace, wiring `NotebookRegisterView.js`'s two `debouncedSave(classroom)` call sites over to the new `saveOrRecordDraft()`, matched a third occurrence: the literal string inside `saveOrRecordDraft()`'s own function body, turning its `else` branch into infinite self-recursion. Caught immediately by grepping the result before moving on to testing — not something that would have been visible from reading the diff casually.
+
+### Files Created
+- `src/js/services/classSessionService.js`
+- `src/js/ui/components/SessionReview.js`
+
+### Files Modified
+- `src/js/ui/views/TrackerView.js` — every per-action save removed; "End Class" button added; Back-button unsaved-changes warning added; module doc comment rewritten to describe the session model.
+- `src/js/ui/views/NotebookRegisterView.js` — `saveOrRecordDraft()` added, session-aware.
+- `src/js/repositories/classroomRepository.js`, `firestoreClassroomRepository.js` — `getClassroomOnce()` added.
+- `src/js/services/workspaceService.js` — `reloadClassroomFromServer()` added.
+- `src/css/styles.css` — Session Review screen styling.
+
+### Breaking Changes
+None to existing data or reports. Behavior changes only in *when* a permanent write happens during Class Mode — a teacher must now explicitly Save Session (or a notebook change must happen outside an active session) for anything to reach Firestore.
+
+### Regression Verification
+Using a real save-counter injected into the test harness's mock repository (not just checking the UI looks right): confirmed 3 stars + 1 swipe + 1 Undo produced **zero** Firestore writes against a baseline count; confirmed Save Session produced **exactly one** write; confirmed Discard Session produced **zero** writes and that reopening Class Mode afterward correctly showed the last-*saved* score, not the discarded draft — proving the re-fetch mechanism genuinely reverts to server state rather than just looking like it does. Separately confirmed notebook marking outside an active session still auto-saves immediately, unchanged. A full regression pass (Settings, Danger Zone, Recognition Screen, accent color picker, icon navigation) confirmed zero impact elsewhere.
+
+### Architectural Decisions Made During Implementation
+- **A dedicated session model was introduced rather than conditionals scattered through existing action handlers** — every action handler's own logic (award, deduct, badge, bucket) is completely unchanged; only the "what happens after" step (save vs. record) changed, and it changed in exactly one place per handler, not through an `if (session) ... else ...` sprinkled across the file.
+- **Discard re-fetches rather than reverses** — reversing each drafted action individually would require the session log to track enough detail to undo *every* kind of action perfectly, duplicating logic `classModeService`'s undo stack already has for some of them and lacks for others (like notes). Re-fetching the known-correct server state sidesteps needing that parity at all.
+- **The note-undo gap was named, not fixed and not hidden** — notes still have no undo in `classModeService`'s stack, a pre-existing limitation unrelated to this refactor; adding it would have been scope creep beyond what was asked.
+
+### Future TODOs
+- Consider adding undo support for notes to `classModeService`'s stack, closing the one remaining gap in Class Mode's action coverage.
+- (Carried over, unchanged): Wire the Student Portal to real student data, pending AI Working Committee review; consolidate Classroom Tracker's ad-hoc avatar implementations; have the proposed `firestore.rules` changes reviewed; real Student Portal authentication; Learning Hub; role-based routing; all previously-listed items.

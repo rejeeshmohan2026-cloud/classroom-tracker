@@ -224,6 +224,25 @@ export function save(classroom) {
   persistClassroom(classroom);
 }
 
+/**
+ * A one-time re-fetch that overwrites the in-memory classroom with
+ * whatever is actually saved on the server — used by
+ * classSessionService.js's discardSession() to throw away draft
+ * mutations that were never written. The normal real-time
+ * subscription (subscribeToClassroom above) only fires when the
+ * server document changes; since a discarded session never wrote
+ * anything, that listener would never naturally re-fire to undo the
+ * in-memory drift, so this does the one-time read + overwrite
+ * directly instead.
+ */
+export async function reloadClassroomFromServer(classroomId) {
+  const classroomData = await repository.getClassroomOnce(classroomId);
+  if (classroomData) {
+    classroomService.upsertClassroom(classroomData);
+    onChangeCallback?.();
+  }
+}
+
 /** Fire-and-forget, matching save()'s pattern — called once, alongside saving a classroom that just generated a new join code (see classroomService.ensureJoinCode()). */
 export function createJoinCodeMapping(code, classroomId) {
   repository.createJoinCodeMapping(code, classroomId).catch((error) => {
