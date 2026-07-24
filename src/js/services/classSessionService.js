@@ -38,6 +38,18 @@ export function isSessionActive(classroom) {
   return sessionByClassroomId.has(classroom.id);
 }
 
+/**
+ * Used by main.js's beforeunload handler — a page refresh/close isn't
+ * scoped to one classroom the way the Back button is, so this checks
+ * across every session this browser tab is tracking, not just one.
+ */
+export function hasAnyUnsavedSession() {
+  for (const session of sessionByClassroomId.values()) {
+    if (session.actions.length > 0) return true;
+  }
+  return false;
+}
+
 export function startSession(classroom) {
   sessionByClassroomId.set(classroom.id, { startedAt: new Date().toISOString(), actions: [] });
 }
@@ -45,14 +57,22 @@ export function startSession(classroom) {
 /**
  * Called alongside every classModeService action (award, deduct,
  * badge, bucket) and every notebook status change — records that a
- * draft change happened, for the Session Review count. Does NOT
- * duplicate what classModeService's undo stack already tracks; this
- * is a separate, simpler log purely for "how many of each kind of
- * thing happened this session," not for reversing anything.
+ * draft change happened, for the Session Review count and Top
+ * Contributors. Does NOT duplicate what classModeService's undo stack
+ * already tracks; this is a separate, simpler log purely for "how many
+ * of each kind of thing happened this session, and to whom," not for
+ * reversing anything. `student` is optional — notebook updates aren't
+ * tied to one specific student the way a star or badge is, so they're
+ * recorded without one.
  */
-export function recordAction(classroom, type) {
+export function recordAction(classroom, type, student = null) {
   const session = getOrCreateSession(classroom.id);
-  session.actions.push({ type, at: new Date().toISOString() });
+  session.actions.push({
+    type,
+    at: new Date().toISOString(),
+    studentId: student?.id || null,
+    studentName: student?.name || null,
+  });
 }
 
 /** Powers the Session Review screen's counts. */
@@ -66,6 +86,37 @@ export function getSessionSummary(classroom) {
     recognitions: actions.filter((a) => a.type === 'badge').length,
     totalActions: actions.length,
   };
+}
+
+/**
+ * Ranks students by stars awarded this session — matching the
+ * "+N Stars" framing in the spec exactly, not a blended "positive
+ * actions" score mixing stars and badges together, which would be
+ * harder to explain at a glance. Ties share the same medal (standard
+ * competition ranking): two students tied for 1st both get 🥇 and the
+ * next distinct count gets 🥉, not 🥈 — skipping silver entirely
+ * rather than awarding it to nobody or awarding two golds and a silver
+ * to a lower count than either of them.
+ */
+export function getTopContributors(classroom, limit = 3) {
+  const session = sessionByClassroomId.get(classroom.id);
+  const actions = session?.actions || [];
+
+  const starsByStudent = new Map(); // studentId -> { name, count }
+  actions
+    .filter((a) => a.type === 'star' && a.studentId)
+    .forEach((a) => {
+      const existing = starsByStudent.get(a.studentId) || { name: a.studentName, count: 0 };
+      existing.count += 1;
+      starsByStudent.set(a.studentId, existing);
+    });
+
+  const ranked = Array.from(starsByStudent.values())
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  const distinctCounts = [...new Set(ranked.map((entry) => entry.count))].slice(0, limit);
+  return ranked.filter((entry) => distinctCounts.includes(entry.count));
 }
 
 /**

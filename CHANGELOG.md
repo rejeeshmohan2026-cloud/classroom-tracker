@@ -1332,3 +1332,52 @@ Using a real save-counter injected into the test harness's mock repository (not 
 ### Future TODOs
 - Consider adding undo support for notes to `classModeService`'s stack, closing the one remaining gap in Class Mode's action coverage.
 - (Carried over, unchanged): Wire the Student Portal to real student data, pending AI Working Committee review; consolidate Classroom Tracker's ad-hoc avatar implementations; have the proposed `firestore.rules` changes reviewed; real Student Portal authentication; Learning Hub; role-based routing; all previously-listed items.
+
+---
+
+## Class Mode UX Refinement (Items 1-5) — Session Lock and Session History Not Yet Built
+
+**Context:** moving from architecture to teacher-experience polish on top of the Class Session model from the previous phase. Eight items requested; this entry covers the five that build cleanly on the existing architecture without new data modeling. The remaining two — Session Lock and Session History — need a genuinely new permanent record shape and deserve focused treatment rather than being rushed alongside these; see Future TODOs.
+
+### 1. Button renamed
+"End Class" → **"Review Session"**, not "Finish & Review". Chosen to match this app's existing button-naming pattern (Save Session, Reset Session — verb + "Session", not a compound/ampersand phrase used nowhere else in this app's vocabulary) — the button was never claimed to end anything; it opens a review, and the new name says exactly that.
+
+### 2. Unsaved Changes indicator
+A small dot + "Unsaved Changes" label appears next to the Class Mode title the moment `classSessionService.getSessionSummary()` reports any draft actions, and disappears automatically once the session is saved or discarded (since that summary naturally reports zero afterward — no separate show/hide logic needed).
+
+### 3. Session Review reorganized
+Four icon-labeled stat cards in a 2×2 grid, in the requested order (⭐ Stars Awarded, 🏅 Recognitions, 📓 Notebook Updates, 📝 Behaviour Notes) — replacing the previous plain list of label/value rows.
+
+### 4. Top Contributors
+`classSessionService.recordAction()` now optionally takes the student the action belonged to, and a new `getTopContributors()` ranks by **star count specifically** — matching the spec's own example ("+4 Stars") rather than a blended "positive actions" score mixing stars and badges, which would be harder to explain at a glance. Ties use **dense ranking**: distinct star counts map to gold/silver/bronze in order regardless of how many students share a count, so a tie for 1st still gives out a silver to the next distinct count rather than skipping it — chosen because a small, three-spot display reads oddly with a medal missing. The section is hidden entirely when there are no positive actions, per the spec.
+
+### 5. Unsaved Navigation Warning
+- **In-app navigation** (the header's Back button): now opens `ui/components/UnsavedSessionDialog.js`, a proper 3-option modal (Continue Teaching / Discard & Leave / Save & Leave), replacing the previous 2-option `window.confirm()` — a plain confirm can't express three distinct outcomes.
+- **Page refresh/tab close**: wired via `beforeunload` in `main.js`. Documented plainly, not glossed over: browsers do not allow custom dialog text or buttons here — this can only trigger the browser's own generic "leave site?" prompt, not the 3-option dialog. That's a platform limitation, not an implementation gap.
+- **Switching classrooms**: covered by the same Back-button dialog, since leaving Class Mode via Back is the only path to reaching a different classroom from here — no separate check was needed.
+
+### A real bug caught and fixed before it reached testing
+Adding the draft indicator's `if` block left it unclosed for one edit — everything after it in the header (the action buttons, "Review Session," all of it) was silently nested inside that conditional, meaning the whole header would have vanished whenever there was no active draft. Caught by viewing the actual resulting file structure immediately after the edit, not by trusting that the syntax check alone (which passed, since the resulting nesting was still syntactically valid JS) meant the change was correct.
+
+### Files Created
+- `src/js/ui/components/UnsavedSessionDialog.js`
+
+### Files Modified
+- `src/js/services/classSessionService.js` — `recordAction()` now takes an optional student; `getTopContributors()` and `hasAnyUnsavedSession()` added.
+- `src/js/ui/views/TrackerView.js` — button renamed; draft indicator added; Back button rewired to the 3-option dialog; all `recordAction()` calls updated to pass the student.
+- `src/js/ui/components/SessionReview.js` — rebuilt around icon stat-cards and a Top Contributors section.
+- `src/js/main.js` — `beforeunload` handler added.
+- `src/css/styles.css` — draft indicator, stat-card grid, Top Contributors, and the dialog's stacked-button layout.
+
+### Breaking Changes
+None. All five items are additive UX on top of the unchanged Class Session architecture — no change to when or what gets written to Firestore.
+
+### Regression Verification
+Built a 3-student scenario (4/3/2 stars) specifically to test Top Contributors' ranking and medal assignment, not just that the section renders — confirmed the exact medal-to-count mapping matches the spec's own example precisely. Confirmed the indicator is absent with zero draft actions and appears correctly worded once any exist. Confirmed the 3-option dialog appears on Back with pending changes, and that both Save & Leave and Discard & Leave produce the correct persisted/reverted score afterward — re-verified by reopening Class Mode after each, not just trusting the dialog's own claim.
+
+### A test-methodology issue worth naming, since it looked like an app bug at first
+An early test run failed with a null bounding-box error when tapping a second and third student's row. Investigating found the cause was in the test script, not the app: Class Mode's view re-renders entirely on every tap, so a `page.$$()` element list captured before the first student's taps goes stale by the time the test tries to use it for the second student. Fixed by re-querying fresh before each tap rather than assuming the first query stayed valid — worth recording since it's exactly the kind of result that could be misread as a real regression without checking further.
+
+### Future TODOs
+- **Session Lock (10-minute reopen window)** and **Session History (a permanent Session record students' history entries reference)** — items 6 and 7 from this request — not built this phase. Both need a genuinely new data model (a permanent session record, timestamp-based lock logic that survives a refresh) rather than the UI-layer changes covered here, and deserve their own focused pass rather than being fit into whatever budget remained in this one.
+- (Carried over, unchanged): note-undo gap in `classModeService`; Student Portal real-data wiring pending AI Working Committee review; consolidate avatar implementations; `firestore.rules` review; Learning Hub; role-based routing; all previously-listed items.

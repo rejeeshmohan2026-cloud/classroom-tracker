@@ -28,6 +28,7 @@ import { openAwardBadgeModal } from '../components/AwardBadgeModal.js';
 import { openAddNoteModal } from '../components/AddNoteModal.js';
 import { showToast } from '../components/Toast.js';
 import { renderSessionReview } from '../components/SessionReview.js';
+import { openUnsavedSessionDialog } from '../components/UnsavedSessionDialog.js';
 import * as studentService from '../../services/studentService.js';
 import * as badgeService from '../../services/badgeService.js';
 import * as noteService from '../../services/noteService.js';
@@ -78,16 +79,24 @@ export function renderTrackerView(container, props) {
   backButton.type = 'button';
   backButton.className = 'btn btn--text';
   backButton.textContent = '← Back';
-  backButton.addEventListener('click', async () => {
+  backButton.addEventListener('click', () => {
     const { totalActions } = classSessionService.getSessionSummary(classroom);
-    if (totalActions > 0) {
-      const confirmed = window.confirm(
-        `This session has ${totalActions} unsaved change${totalActions === 1 ? '' : 's'}. Leaving now without ending class will discard ${totalActions === 1 ? 'it' : 'them'}. Leave anyway?`
-      );
-      if (!confirmed) return;
-      await classSessionService.discardSession(classroom);
+    if (totalActions === 0) {
+      onBack();
+      return;
     }
-    onBack();
+    openUnsavedSessionDialog({
+      onDiscardAndLeave: async () => {
+        await classSessionService.discardSession(classroom);
+        showToast('Session discarded — nothing was saved');
+        onBack();
+      },
+      onSaveAndLeave: () => {
+        classSessionService.commitSession(classroom);
+        showToast('Session saved');
+        onBack();
+      },
+    });
   });
 
   const titleBlock = document.createElement('div');
@@ -104,6 +113,14 @@ export function renderTrackerView(container, props) {
     subtitleEl.className = 'tracker-header__subtitle';
     subtitleEl.textContent = subtitle;
     titleBlock.appendChild(subtitleEl);
+  }
+
+  const sessionSummaryForIndicator = classSessionService.getSessionSummary(classroom);
+  if (sessionSummaryForIndicator.totalActions > 0) {
+    const draftIndicator = document.createElement('span');
+    draftIndicator.className = 'tracker-header__draft-indicator';
+    draftIndicator.innerHTML = '<span class="tracker-header__draft-dot" aria-hidden="true"></span>Unsaved Changes';
+    titleBlock.appendChild(draftIndicator);
   }
 
   const actions = document.createElement('div');
@@ -171,7 +188,7 @@ export function renderTrackerView(container, props) {
   const endClassButton = document.createElement('button');
   endClassButton.type = 'button';
   endClassButton.className = 'btn btn--primary';
-  endClassButton.textContent = 'End Class';
+  endClassButton.textContent = 'Review Session';
   endClassButton.addEventListener('click', () => {
     renderTrackerView(container, { ...props, _showSessionReview: true });
   });
@@ -213,14 +230,14 @@ export function renderTrackerView(container, props) {
 
 function handleTap(classroom, team, student, rerender) {
   classModeService.awardStar(classroom, student);
-  classSessionService.recordAction(classroom, 'star');
+  classSessionService.recordAction(classroom, 'star', student);
   showToast(`+1 Star awarded to ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
 
 function handleSwipeLeft(classroom, team, student, rerender) {
   classModeService.deductPoint(classroom, student);
-  classSessionService.recordAction(classroom, 'behaviour');
+  classSessionService.recordAction(classroom, 'behaviour', student);
   showToast(`-1 Negative recorded for ${student.name}`);
   rerender({ studentId: student.id, teamId: team.id });
 }
@@ -237,7 +254,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
         onAwardExisting: (badgeName) => {
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            classSessionService.recordAction(classroom, 'badge');
+            classSessionService.recordAction(classroom, 'badge', student);
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }
@@ -246,7 +263,7 @@ function handleLongPress(classroom, team, student, { onSelectStudent, rerender }
           badgeService.addBadgeToCatalog(classroom, badgeName);
           const entry = classModeService.awardBadgeQuick(classroom, student, badgeName);
           if (entry) {
-            classSessionService.recordAction(classroom, 'badge');
+            classSessionService.recordAction(classroom, 'badge', student);
             showToast(`${badgeName} Badge awarded`);
             rerender();
           }

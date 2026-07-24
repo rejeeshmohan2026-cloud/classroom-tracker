@@ -20,6 +20,7 @@ import * as workspaceService from './services/workspaceService.js';
 import * as authService from './services/authService.js';
 import * as continueWorkingService from './services/continueWorkingService.js';
 import * as accentColorService from './services/accentColorService.js';
+import * as classSessionService from './services/classSessionService.js';
 import * as accentColorPreferenceService from './services/accentColorPreferenceService.js';
 import { ClassroomValidationError } from './services/classroomService.js';
 import * as router from './ui/router.js';
@@ -399,6 +400,21 @@ function init() {
   // Registered once — renderRoute() itself checks auth/loading state on
   // every call, so this doesn't need to be re-attached on sign-in/out.
   router.onRouteChange(renderRoute);
+
+  // Browsers do not allow custom dialog text or buttons on
+  // beforeunload (a long-standing security restriction, not something
+  // any site can override) — this can only trigger the browser's own
+  // generic "leave site? changes may not be saved" prompt, not the
+  // three-option Continue/Discard/Save dialog used for in-app
+  // navigation (see ui/components/UnsavedSessionDialog.js). Still
+  // meaningfully protects against an accidental refresh or tab close
+  // losing a draft Class Session.
+  window.addEventListener('beforeunload', (event) => {
+    if (classSessionService.hasAnyUnsavedSession()) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
 
   authService.initAuth();
 

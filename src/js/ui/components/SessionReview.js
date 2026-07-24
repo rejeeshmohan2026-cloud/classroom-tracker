@@ -1,24 +1,40 @@
 /**
  * ui/components/SessionReview.js
  *
- * Shown when a teacher presses "End Class" — the one moment in the new
- * Class Session model where the teacher decides what happens to
- * everything that occurred this session. Counts come from
- * services/classSessionService.js's in-memory session log, not from
- * Firestore (nothing has been written there yet). Three outcomes:
- * Continue Teaching (dismiss, keep the session open, nothing changes),
- * Save Session (the one and only permanent write for the whole
- * session), and Discard Session (nothing is written; every draft
- * change is thrown away by re-fetching the classroom from Firestore).
+ * Shown when a teacher presses "Review Session" — the one moment in
+ * the Class Session model where the teacher decides what happens to
+ * everything that occurred this session. Counts and Top Contributors
+ * come from services/classSessionService.js's in-memory session log,
+ * not from Firestore (nothing has been written there yet). Three
+ * outcomes: Continue Teaching (dismiss, keep the session open, nothing
+ * changes), Save Session (the one and only permanent write for the
+ * whole session), and Discard Session (nothing is written; every
+ * draft change is thrown away by re-fetching the classroom from
+ * Firestore).
+ *
+ * Renamed from "End Class" to "Review Session" (the button that opens
+ * this screen) — clicking it doesn't end anything by itself, it opens
+ * this review; the old label implied an action this button didn't
+ * actually take.
  */
 
 import * as classSessionService from '../../services/classSessionService.js';
 import { getDisplayName } from '../../services/classroomService.js';
 
+const STAT_SECTIONS = [
+  { key: 'starsAwarded', icon: '\u2b50', label: 'Stars Awarded' },
+  { key: 'recognitions', icon: '\ud83c\udfc5', label: 'Recognitions' },
+  { key: 'notebookUpdates', icon: '\ud83d\udcd3', label: 'Notebook Updates' },
+  { key: 'behaviourNotes', icon: '\ud83d\udcdd', label: 'Behaviour Notes' },
+];
+
+const MEDALS = ['\ud83e\udd47', '\ud83e\udd48', '\ud83e\udd49'];
+
 export function renderSessionReview(container, { classroom, onContinueTeaching, onSaveSession, onDiscardSession }) {
   container.innerHTML = '';
 
   const summary = classSessionService.getSessionSummary(classroom);
+  const topContributors = classSessionService.getTopContributors(classroom);
 
   const wrapper = document.createElement('div');
   wrapper.className = 'session-review';
@@ -33,21 +49,49 @@ export function renderSessionReview(container, { classroom, onContinueTeaching, 
   subtitle.textContent = getDisplayName(classroom);
   wrapper.appendChild(subtitle);
 
-  const stats = document.createElement('div');
-  stats.className = 'session-review__stats';
-  stats.append(
-    createStatRow('Stars Awarded', summary.starsAwarded),
-    createStatRow('Behaviour Notes', summary.behaviourNotes),
-    createStatRow('Notebook Updates', summary.notebookUpdates),
-    createStatRow('Recognitions', summary.recognitions)
-  );
-  wrapper.appendChild(stats);
+  const statGrid = document.createElement('div');
+  statGrid.className = 'session-review__stat-grid';
+  STAT_SECTIONS.forEach(({ key, icon, label }) => {
+    statGrid.appendChild(createStatCard(icon, label, summary[key]));
+  });
+  wrapper.appendChild(statGrid);
 
   if (summary.totalActions === 0) {
     const emptyNote = document.createElement('p');
     emptyNote.className = 'session-review__empty-note';
     emptyNote.textContent = 'Nothing has happened this session yet.';
     wrapper.appendChild(emptyNote);
+  }
+
+  // Hidden entirely when there are no positive actions this session —
+  // showing an empty "Top Contributors" section would read as a
+  // pointed observation about a lesson with no stars, not a helpful
+  // summary.
+  if (topContributors.length > 0) {
+    const topSection = document.createElement('div');
+    topSection.className = 'session-review__top-contributors';
+
+    const topTitle = document.createElement('h2');
+    topTitle.className = 'session-review__section-title';
+    topTitle.textContent = 'Top Contributors';
+    topSection.appendChild(topTitle);
+
+    // Dense ranking: distinct star counts map to gold/silver/bronze in
+    // order, regardless of how many students share a count — a tie for
+    // 1st gives everyone tied gold AND still awards a silver to the
+    // next distinct count, rather than skipping straight to bronze.
+    // Chosen over "standard" competition ranking (which would skip
+    // silver on a tie) because a small, three-spot recognition display
+    // reads oddly with a medal missing — every visible rank should
+    // have something in it.
+    const distinctCounts = [...new Set(topContributors.map((entry) => entry.count))];
+
+    topContributors.forEach((entry) => {
+      const medalIndex = distinctCounts.indexOf(entry.count);
+      topSection.appendChild(createContributorRow(MEDALS[medalIndex], entry.name, entry.count));
+    });
+
+    wrapper.appendChild(topSection);
   }
 
   const divider = document.createElement('hr');
@@ -86,18 +130,45 @@ export function renderSessionReview(container, { classroom, onContinueTeaching, 
   container.appendChild(wrapper);
 }
 
-function createStatRow(label, value) {
-  const row = document.createElement('div');
-  row.className = 'session-review__stat-row';
+function createStatCard(icon, label, value) {
+  const card = document.createElement('div');
+  card.className = 'session-review__stat-card';
 
-  const labelEl = document.createElement('span');
+  const iconEl = document.createElement('span');
+  iconEl.className = 'session-review__stat-icon';
+  iconEl.setAttribute('aria-hidden', 'true');
+  iconEl.textContent = icon;
+
+  const labelEl = document.createElement('p');
   labelEl.className = 'session-review__stat-label';
   labelEl.textContent = label;
 
-  const valueEl = document.createElement('span');
+  const valueEl = document.createElement('p');
   valueEl.className = 'session-review__stat-value';
   valueEl.textContent = String(value);
 
-  row.append(labelEl, valueEl);
+  card.append(iconEl, labelEl, valueEl);
+  return card;
+}
+
+function createContributorRow(medal, name, count) {
+  const row = document.createElement('div');
+  row.className = 'session-review__contributor-row';
+
+  const medalEl = document.createElement('span');
+  medalEl.className = 'session-review__contributor-medal';
+  medalEl.setAttribute('aria-hidden', 'true');
+  medalEl.textContent = medal;
+
+  const textEl = document.createElement('div');
+  const nameEl = document.createElement('p');
+  nameEl.className = 'session-review__contributor-name';
+  nameEl.textContent = name;
+  const countEl = document.createElement('p');
+  countEl.className = 'session-review__contributor-count';
+  countEl.textContent = `+${count} Star${count === 1 ? '' : 's'}`;
+  textEl.append(nameEl, countEl);
+
+  row.append(medalEl, textEl);
   return row;
 }
